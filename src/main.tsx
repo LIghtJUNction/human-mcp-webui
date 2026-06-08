@@ -39,6 +39,7 @@ function App() {
   const [token, setToken] = useState(() => localStorage.getItem(tokenKey) ?? "");
   const [user, setUser] = useState<User | null>(null);
   const [requests, setRequests] = useState<HumanRequest[]>([]);
+  const [onlineCount, setOnlineCount] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const selected = useMemo(
@@ -74,12 +75,16 @@ function App() {
       const message = JSON.parse(event.data);
       if (message.type === "snapshot") {
         setRequests(message.requests);
+        setOnlineCount(message.online_count ?? 0);
       }
       if (message.type === "request_created") {
         setRequests((current) => upsertRequest(current, message.request));
       }
       if (message.type === "request_answered") {
         setRequests((current) => current.filter((request) => request.id !== message.id));
+      }
+      if (message.type === "presence_changed") {
+        setOnlineCount(message.online_count);
       }
     };
     return () => ws.close();
@@ -104,6 +109,7 @@ function App() {
 
         <div className="toolbar">
           <span>{requests.length} pending</span>
+          <span className="online">{onlineCount} online</span>
           <button className="iconButton" title="Refresh" onClick={() => refresh(token, setRequests, setBusy)}>
             <RefreshCw size={18} className={busy ? "spin" : ""} />
           </button>
@@ -296,4 +302,3 @@ function logout(
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
-

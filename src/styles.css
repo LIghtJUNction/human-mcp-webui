@@ -91,6 +91,20 @@ h2 {
   min-height: 40px;
 }
 
+.toolbar .online {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar .online::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2e7a55;
+}
+
 .requestList {
   display: flex;
   flex: 1;
@@ -332,4 +346,3 @@ input {
     padding: 18px;
   }
 }
-
