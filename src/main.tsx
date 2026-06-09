@@ -107,6 +107,7 @@ type ReputationBreakdown = {
 
 type UserProfile = {
   email: string;
+  login?: string | null;
   provider: "password" | "github" | "passkey";
   profile: string;
   tags: string[];
@@ -115,6 +116,7 @@ type UserProfile = {
   reputation_breakdown?: ReputationBreakdown | null;
   friend_code?: string;
   intro_code: string;
+  visibility?: ProfileVisibility;
   is_public: boolean;
   is_friend: boolean;
   friend_request_sent: boolean;
@@ -138,6 +140,7 @@ type TagStat = {
 
 type HumanLeaderboardEntry = {
   email: string;
+  login?: string | null;
   requests_handled: number;
   sent_tokens: number;
   latest_answered_at?: number | null;
@@ -236,6 +239,7 @@ type WebhookConfig = {
 };
 
 type AgentDirectoryVisibility = "public_users" | "reputation_at_least" | "self_and_friends" | "self_only";
+type ProfileVisibility = "private" | "friends" | "agents" | "public";
 
 type AdminSettings = {
   allow_registration: boolean;
@@ -268,6 +272,7 @@ type AgentAccess = {
   agent_directory_min_reputation?: number;
   friend_code?: string;
   intro_code: string;
+  visibility?: ProfileVisibility;
   is_public: boolean;
   onboarding_completed: boolean;
 };
@@ -366,6 +371,21 @@ const agentDirectoryVisibilityOptions: Array<{
   { value: "self_only", labelKey: "agentDirectorySelfOnly", helpKey: "agentDirectorySelfOnlyHelp" }
 ];
 
+const profileVisibilityOptions: Array<{
+  value: ProfileVisibility;
+  labelKey: string;
+  helpKey: string;
+}> = [
+  { value: "private", labelKey: "profileVisibilityPrivate", helpKey: "profileVisibilityPrivateHelp" },
+  { value: "friends", labelKey: "profileVisibilityFriends", helpKey: "profileVisibilityFriendsHelp" },
+  { value: "agents", labelKey: "profileVisibilityAgents", helpKey: "profileVisibilityAgentsHelp" },
+  { value: "public", labelKey: "profileVisibilityPublic", helpKey: "profileVisibilityPublicHelp" }
+];
+
+function normalizedProfileVisibility(profile: Pick<UserProfile, "visibility" | "is_public"> | null | undefined): ProfileVisibility {
+  return profile?.visibility ?? (profile?.is_public ? "public" : "private");
+}
+
 function normalizedAgentDirectoryVisibility(settings: AdminSettings | null | undefined): AgentDirectoryVisibility {
   return settings?.agent_directory_visibility ?? (settings?.allow_agent_directory ? "public_users" : "self_only");
 }
@@ -415,8 +435,9 @@ const zhText: Record<string, string> = {
   loginWithOAuth: "使用 OAuth 登录",
   oauthUnavailable: "OAuth 登录尚未开通，请联系管理员开通账号。",
   passkeyAccess: "已绑定 Passkey？",
-  loginHeroTitle: "Agent 请求进入 MCP，人类给出可审计回复",
+  loginHeroTitle: "Agents的人才库",
   loginHeroSubtitle: "humen-mcp 把 Codex、Claude Code 等 Agent 的阻塞问题路由给在线用户，回答后再让 Agent 继续执行。",
+  loginHeroJoinCue: "嘿人类，快加入人才库",
   loginFlowAgent: "Agent 请求",
   loginFlowAgentHelp: "需要判断、审批或简短文本",
   loginFlowMcp: "ask_humen",
@@ -442,7 +463,7 @@ const zhText: Record<string, string> = {
   passkeys: "Passkeys",
   passkeyHelp: "登录后可在当前设备或密码管理器中绑定 Passkey；下次输入邮箱后即可无密码登录。",
   addPasskey: "绑定 Passkey",
-  passkeyName: "Passkey 名称",
+  passkeyWaiting: "等待设备确认...",
   noPasskeys: "尚未绑定 Passkey",
   removePasskey: "删除 Passkey",
   passkeyAdded: "Passkey 已绑定。",
@@ -492,6 +513,7 @@ const zhText: Record<string, string> = {
   reputationSeed: "初始来源",
   reputationSeedGithub: "GitHub 种子",
   reputationSeedNone: "未初始化",
+  reputationDefault: "默认信誉",
   reputationWeightedHelp: "GitHub 初始信誉 + 按评分者信誉加权的反馈",
   rateHuman: "评分",
   reportHuman: "举报",
@@ -527,8 +549,15 @@ const zhText: Record<string, string> = {
   profileHelp: "Agent 可以搜索这个简介和 #标签，建议说明能力、可用时间和注意事项。",
   onboardingTitle: "首次配置",
   onboardingHelp: "完成简介、标签、公开状态和好友代码确认后，Agent 才能稳定地把任务和好友关系关联到你。",
-  publicUser: "公开出现在人才库",
-  privateUserHelp: "关闭公开后，别人只能通过好友代码发送好友申请；好友仍然能看到你。",
+  profileVisibility: "可见范围",
+  profileVisibilityPrivate: "仅自己",
+  profileVisibilityPrivateHelp: "不会出现在公开人才库，也不会被 Agent 搜索到；别人只能通过好友码申请。",
+  profileVisibilityFriends: "好友可见",
+  profileVisibilityFriendsHelp: "你和已接受好友可互相看到；Agent 不能搜索到你。",
+  profileVisibilityAgents: "Agent 可见",
+  profileVisibilityAgentsHelp: "有效 Agent Secret 可按管理员策略搜索到你；普通用户仍需要好友关系。",
+  profileVisibilityPublic: "公开",
+  profileVisibilityPublicHelp: "公开人才库、好友发现和 Agent 搜索都可看到你。",
   profile: "简介",
   useTemplate: "使用模板",
   saveProfile: "保存简介",
@@ -629,6 +658,7 @@ const enText: Record<string, string> = {
   passkeyAccess: "Already have a passkey?",
   loginHeroTitle: "Agent requests enter MCP. Humans return auditable replies.",
   loginHeroSubtitle: "humen-mcp routes blocking questions from Codex, Claude Code, and other agents to online humans, then resumes the agent with a recorded answer.",
+  loginHeroJoinCue: "Hey human, join the talent pool",
   loginFlowAgent: "Agent request",
   loginFlowAgentHelp: "Judgment, approval, or short text",
   loginFlowMcp: "ask_humen",
@@ -654,7 +684,7 @@ const enText: Record<string, string> = {
   passkeys: "Passkeys",
   passkeyHelp: "After signing in, bind a passkey on this device or password manager. Next time, enter your email and sign in without a password.",
   addPasskey: "Add passkey",
-  passkeyName: "Passkey name",
+  passkeyWaiting: "Waiting for device...",
   noPasskeys: "No passkeys added",
   removePasskey: "Remove passkey",
   passkeyAdded: "Passkey added.",
@@ -704,6 +734,7 @@ const enText: Record<string, string> = {
   reputationSeed: "Seed",
   reputationSeedGithub: "GitHub seed",
   reputationSeedNone: "No seed",
+  reputationDefault: "Default reputation",
   reputationWeightedHelp: "GitHub seed plus feedback weighted by rater reputation",
   rateHuman: "Rate",
   reportHuman: "Report",
@@ -739,8 +770,15 @@ const enText: Record<string, string> = {
   profileHelp: "Agents can search this profile and #tags. Include skills, availability, and notes.",
   onboardingTitle: "First-time setup",
   onboardingHelp: "Confirm your profile, tags, public visibility, and friend code so agents and friends map to your account correctly.",
-  publicUser: "Show publicly in the talent pool",
-  privateUserHelp: "When public is off, others can still send friend requests with your friend code. Friends can still see you.",
+  profileVisibility: "Visibility",
+  profileVisibilityPrivate: "Only me",
+  profileVisibilityPrivateHelp: "Hidden from the public talent pool and agent search. Others need your friend code to request access.",
+  profileVisibilityFriends: "Friends",
+  profileVisibilityFriendsHelp: "Visible to you and accepted friends. Agents cannot search this profile.",
+  profileVisibilityAgents: "Agents",
+  profileVisibilityAgentsHelp: "Visible to valid Agent Secrets under the admin policy. Regular users still need friendship.",
+  profileVisibilityPublic: "Public",
+  profileVisibilityPublicHelp: "Visible in the public talent pool, friend discovery, and agent search.",
   profile: "Profile",
   useTemplate: "Use template",
   saveProfile: "Save profile",
@@ -1324,6 +1362,10 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
           <span className="loginEyebrow">humen-mcp / ask_humen</span>
           <h2>{t("loginHeroTitle")}</h2>
           <p>{t("loginHeroSubtitle")}</p>
+          <pre className="loginJoinCue" aria-label={t("loginHeroJoinCue")}>{`        ${t("loginHeroJoinCue")}
+              |
+              |
+              v`}</pre>
         </section>
 
         <section className="loginPanel">
@@ -1522,7 +1564,7 @@ function LoginPublicSections({ leaderboard }: { leaderboard: HumanLeaderboardEnt
             {handledRows.length > 0 ? (
               <ol>
                 {handledRows.map((entry, index) => (
-                  <li key={entry.email}><span>#{index + 1}</span><strong>{entry.email}</strong><em>{formatNumber(entry.requests_handled)}</em></li>
+                  <li key={entry.email}><span>#{index + 1}</span><strong>{displayIdentity(entry)}</strong><em>{formatNumber(entry.requests_handled)}</em></li>
                 ))}
               </ol>
             ) : (
@@ -1537,7 +1579,7 @@ function LoginPublicSections({ leaderboard }: { leaderboard: HumanLeaderboardEnt
             {tokenRows.length > 0 ? (
               <ol>
                 {tokenRows.map((entry, index) => (
-                  <li key={entry.email}><span>#{index + 1}</span><strong>{entry.email}</strong><em>{formatCompactNumber(entry.sent_tokens)}</em></li>
+                  <li key={entry.email}><span>#{index + 1}</span><strong>{displayIdentity(entry)}</strong><em>{formatCompactNumber(entry.sent_tokens)}</em></li>
                 ))}
               </ol>
             ) : (
@@ -1554,7 +1596,7 @@ function LoginPublicSections({ leaderboard }: { leaderboard: HumanLeaderboardEnt
                 {reputationRows.map((entry, index) => (
                   <li key={entry.email}>
                     <span>#{index + 1}</span>
-                    <strong>{entry.email}</strong>
+                    <strong>{displayIdentity(entry)}</strong>
                     <em>{formatScore(entry.reputation)}</em>
                   </li>
                 ))}
@@ -2096,9 +2138,9 @@ function LeaderboardView({
           <article className="leaderboardRow" key={entry.email}>
             <div className="rankBadge">#{index + 1}</div>
             <div className="leaderIdentity">
-              <div className="avatarCircle">{initials(entry.email)}</div>
+              <div className="avatarCircle">{initials(displayIdentity(entry))}</div>
               <div>
-                <strong>{entry.email}</strong>
+                <strong>{displayIdentity(entry)}</strong>
                 <p>{entry.profile || t("profileMissing")}</p>
                 <div className="tagRow">{entry.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
               </div>
@@ -2408,7 +2450,7 @@ function RelationStrip({
       <div>
         {users.map((profile) => (
           <article key={profile.email} className="relationItem">
-            <span>{profile.email}</span>
+            <span>{displayIdentity(profile)}</span>
             {action(profile)}
           </article>
         ))}
@@ -3070,12 +3112,18 @@ function AdminView({
     const token = githubTokenDraft.trim();
     if (!token) return;
     const ok = await saveSettings({ ...settings, github_api_token: token });
-    if (ok) setGithubTokenDraft("");
+    if (ok) {
+      setSettings({ ...settings, github_api_token_configured: true });
+      setGithubTokenDraft("");
+    }
   }
 
   async function clearGithubApiToken() {
     const ok = await saveSettings({ ...settings, github_api_token: "" });
-    if (ok) setGithubTokenDraft("");
+    if (ok) {
+      setSettings({ ...settings, github_api_token_configured: false });
+      setGithubTokenDraft("");
+    }
   }
 
   return (
@@ -3090,46 +3138,6 @@ function AdminView({
 
       <PasskeyPanel token={token} />
       {settingsStatus && <div className={settingsStatus === t("saved") ? "notice" : "notice warning"}>{settingsStatus}</div>}
-
-      <AdminReportsPanel token={token} reports={reports} setReports={setReports} />
-
-      <section className="panel">
-        <div className="panelHead">
-          <div className="panelTitle">
-            <RefreshCw size={18} />
-            <div>
-              <h3>{t("serverUpdate")}</h3>
-              <p>{t("serverUpdateSubtitle")}</p>
-            </div>
-          </div>
-          <button className="primary" onClick={startSelfUpdate} disabled={updateBusy || updateStatus?.running || !updateStatus?.enabled}>
-            <RefreshCw size={16} className={updateBusy || updateStatus?.running ? "spin" : ""} /> {updateBusy || updateStatus?.running ? t("updatingServer") : t("startSelfUpdate")}
-          </button>
-        </div>
-        <div className="metaRow updateMeta">
-          <span>{t("serverVersion")} {updateStatus?.current_version ?? "unknown"}</span>
-          <span>{updateStatus?.enabled ? t("selfUpdateEnabled") : t("selfUpdateDisabled")}</span>
-          <FrontendVersion />
-        </div>
-        {updateMessage && <div className={updateMessage === t("updatingServer") || updateMessage === t("selfUpdateStarted") ? "notice" : "notice warning"}>{updateMessage}</div>}
-      </section>
-
-      <section className="panel">
-        <div className="panelHead">
-          <Shield size={18} />
-          <h3>{t("registration")}</h3>
-        </div>
-        <label className="toggleRow">
-          <span>{t("allowNewUsers")}</span>
-          <input
-            type="checkbox"
-            checked={settings.allow_registration}
-            onChange={(event) => saveSettings({ ...settings, allow_registration: event.target.checked })}
-          />
-        </label>
-      </section>
-
-      <AgentDirectoryPolicyPanel settings={settings} onSave={saveSettings} />
 
       <section className="panel">
         <div className="panelHead">
@@ -3162,6 +3170,46 @@ function AdminView({
             <Trash2 size={16} /> {t("clearToken")}
           </button>
         </div>
+      </section>
+
+      <AdminReportsPanel token={token} reports={reports} setReports={setReports} />
+
+      <section className="panel">
+        <div className="panelHead">
+          <Shield size={18} />
+          <h3>{t("registration")}</h3>
+        </div>
+        <label className="toggleRow">
+          <span>{t("allowNewUsers")}</span>
+          <input
+            type="checkbox"
+            checked={settings.allow_registration}
+            onChange={(event) => saveSettings({ ...settings, allow_registration: event.target.checked })}
+          />
+        </label>
+      </section>
+
+      <AgentDirectoryPolicyPanel settings={settings} onSave={saveSettings} />
+
+      <section className="panel">
+        <div className="panelHead">
+          <div className="panelTitle">
+            <RefreshCw size={18} />
+            <div>
+              <h3>{t("serverUpdate")}</h3>
+              <p>{t("serverUpdateSubtitle")}</p>
+            </div>
+          </div>
+          <button className="primary" onClick={startSelfUpdate} disabled={updateBusy || updateStatus?.running || !updateStatus?.enabled}>
+            <RefreshCw size={16} className={updateBusy || updateStatus?.running ? "spin" : ""} /> {updateBusy || updateStatus?.running ? t("updatingServer") : t("startSelfUpdate")}
+          </button>
+        </div>
+        <div className="metaRow updateMeta">
+          <span>{t("serverVersion")} {updateStatus?.current_version ?? "unknown"}</span>
+          <span>{updateStatus?.enabled ? t("selfUpdateEnabled") : t("selfUpdateDisabled")}</span>
+          <FrontendVersion />
+        </div>
+        {updateMessage && <div className={updateMessage === t("updatingServer") || updateMessage === t("selfUpdateStarted") ? "notice" : "notice warning"}>{updateMessage}</div>}
       </section>
 
       <section className="panel">
@@ -3707,7 +3755,7 @@ function ProfilePanel({ token }: { token: string }) {
   const [profile, setProfile] = useState(template);
   const [tags, setTags] = useState("");
   const [introCode, setIntroCode] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
+  const [visibility, setVisibility] = useState<ProfileVisibility>("private");
   const [onboardingCompleted, setOnboardingCompleted] = useState(true);
   const [status, setStatus] = useState("");
 
@@ -3719,7 +3767,7 @@ function ProfilePanel({ token }: { token: string }) {
         setProfile(data.profile || template);
         setTags(data.tags.join(" "));
         setIntroCode(data.friend_code ?? data.intro_code ?? "");
-        setIsPublic(Boolean(data.is_public));
+        setVisibility(normalizedProfileVisibility(data));
         setOnboardingCompleted(Boolean(data.onboarding_completed));
       })
       .catch(() => {});
@@ -3734,7 +3782,8 @@ function ProfilePanel({ token }: { token: string }) {
       body: JSON.stringify({
         profile,
         tags: splitTags(tags),
-        is_public: isPublic,
+        visibility,
+        is_public: visibility === "public",
         onboarding_completed: true
       })
     });
@@ -3747,7 +3796,7 @@ function ProfilePanel({ token }: { token: string }) {
       setProfile(data.profile || template);
       setTags(data.tags.join(" "));
       setIntroCode(data.friend_code ?? data.intro_code ?? "");
-      setIsPublic(Boolean(data.is_public));
+      setVisibility(normalizedProfileVisibility(data));
       setOnboardingCompleted(Boolean(data.onboarding_completed));
     }
     setStatus(t("profileSaved"));
@@ -3775,12 +3824,16 @@ function ProfilePanel({ token }: { token: string }) {
           <span>{t("introCode")}</span>
           <input value={introCode} readOnly onFocus={(event) => event.currentTarget.select()} />
         </label>
-        <label className="toggleRow profileToggle">
-          <span>
-            {t("publicUser")}
-            <small>{t("privateUserHelp")}</small>
-          </span>
-          <input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} />
+        <label>
+          <span>{t("profileVisibility")}</span>
+          <select value={visibility} onChange={(event) => setVisibility(event.target.value as ProfileVisibility)}>
+            {profileVisibilityOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {t(option.labelKey)}
+              </option>
+            ))}
+          </select>
+          <small>{t(profileVisibilityOptions.find((option) => option.value === visibility)?.helpKey ?? "profileVisibilityPrivateHelp")}</small>
         </label>
         <label>
           <span>{t("profile")}</span>
@@ -3806,7 +3859,6 @@ function ProfilePanel({ token }: { token: string }) {
 
 function PasskeyPanel({ token }: { token: string }) {
   const [passkeys, setPasskeys] = useState<PasskeyInfo[]>([]);
-  const [name, setName] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const supported = passkeysSupported();
@@ -3848,7 +3900,6 @@ function PasskeyPanel({ token }: { token: string }) {
         headers: { ...authHeaders(token), "content-type": "application/json" },
         body: JSON.stringify({
           registration_id: challenge.registration_id,
-          name: name.trim() || undefined,
           credential: publicKeyCredentialToJson(credential)
         })
       });
@@ -3857,10 +3908,9 @@ function PasskeyPanel({ token }: { token: string }) {
         return;
       }
       setPasskeys((await safeJson<PasskeyInfo[]>(finish)) ?? []);
-      setName("");
       setStatus(t("passkeyAdded"));
-    } catch {
-      setStatus(t("passkeyRegisterFailed"));
+    } catch (error) {
+      setStatus(error instanceof Error ? `${t("passkeyRegisterFailed")}: ${error.message}` : t("passkeyRegisterFailed"));
     } finally {
       setBusy(false);
     }
@@ -3897,12 +3947,8 @@ function PasskeyPanel({ token }: { token: string }) {
       </div>
 
       <div className="passkeyAddRow">
-        <label>
-          <span>{t("passkeyName")}</span>
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="MacBook Touch ID" />
-        </label>
         <button className="primary" onClick={addPasskey} disabled={busy || !supported}>
-          <KeyRound size={17} /> {t("addPasskey")}
+          <KeyRound size={17} /> {busy ? t("passkeyWaiting") : t("addPasskey")}
         </button>
       </div>
 
@@ -4004,9 +4050,9 @@ function UserCard({
 
   return (
     <article className="userCard">
-      <div className="avatarCircle">{initials(profile.email)}</div>
+      <div className="avatarCircle">{initials(displayIdentity(profile))}</div>
       <div>
-        <strong>{profile.email}</strong>
+        <strong>{displayIdentity(profile)}</strong>
         <p>{profile.profile || t("profileMissing")}</p>
         <div className="metaRow">
           <span className={profile.online ? "status onlineStatus" : "status"}>{profile.online ? t("onlineStatus") : t("offlineStatus")}</span>
@@ -4017,7 +4063,7 @@ function UserCard({
             breakdown={profile.reputation_breakdown}
             compact
           />
-          {profile.is_public && <span>{currentLanguage() === "zh" ? "公开" : "Public"}</span>}
+          <span>{profileVisibilityLabel(profile.visibility ?? (profile.is_public ? "public" : "private"))}</span>
           {banned && <span className="dangerText">banned until {formatTime(profile.ban_expires_at!)}</span>}
         </div>
         {(profile.friend_code ?? profile.intro_code) && (
@@ -4094,10 +4140,11 @@ function ReputationBadge({
   compact?: boolean;
 }) {
   const seedSource = breakdown?.seed_source;
+  const totalWeight = breakdown?.total_weight ?? 0;
+  const hasEvidence = totalWeight > 0 || count > 0;
   const seedLabel = seedSource === "github"
     ? t("reputationSeedGithub")
-    : seedSource || t("reputationSeedNone");
-  const totalWeight = breakdown?.total_weight ?? 0;
+    : seedSource || (hasEvidence ? t("reputationSeedNone") : t("reputationDefault"));
   const confidence = breakdown?.confidence ?? 0;
   const title = [
     t("reputationWeightedHelp"),
@@ -4109,7 +4156,7 @@ function ReputationBadge({
     <span className={`reputationBadge ${compact ? "compact" : ""}`} title={title}>
       <strong>{formatScore(score)}</strong>
       <span className="reputationDetails">
-        {t("reputation")} · {count} · {seedLabel}
+        {hasEvidence ? t("reputation") : t("reputationDefault")} · {count} · {seedLabel}
       </span>
       {!compact && (
         <span className="reputationDetails">
@@ -4430,11 +4477,17 @@ function splitTags(value: string) {
 }
 
 function initials(email: string) {
-  return email.slice(0, 2).toUpperCase();
+  return displayIdentity({ email }).slice(0, 2).toUpperCase();
 }
 
 function avatarText(user: User, preferences: Preferences) {
   return (preferences.avatarText.trim() || initials(user.email)).slice(0, 4).toUpperCase();
+}
+
+function displayIdentity(profile: Pick<UserProfile, "email" | "login"> | Pick<User, "email">) {
+  if ("login" in profile && profile.login) return profile.login;
+  if (profile.email.startsWith("github:")) return profile.email.replace(/^github:/, "GitHub ");
+  return profile.email;
 }
 
 function randomId() {
@@ -4538,6 +4591,11 @@ function oauthStartUrl(provider: string) {
 
 function oauthCallbackUrl(provider: string) {
   return new URL(apiPath(`/api/auth/oauth/${normalizeOAuthProvider(provider)}/callback`), window.location.href).toString();
+}
+
+function profileVisibilityLabel(visibility: ProfileVisibility) {
+  const option = profileVisibilityOptions.find((item) => item.value === visibility) ?? profileVisibilityOptions[0];
+  return t(option.labelKey);
 }
 
 function mergeOAuthSecrets(saved: AdminSettings, draft: AdminSettings): AdminSettings {

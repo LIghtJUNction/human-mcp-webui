@@ -4,9 +4,9 @@ import react from "@vitejs/plugin-react";
 
 function gitCommit() {
   try {
-    return execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
+    return execSync("git -C . rev-parse --short HEAD", { encoding: "utf8" }).trim();
   } catch {
-    return "unknown";
+    return process.env.GITHUB_SHA?.slice(0, 7) || "dev";
   }
 }
 

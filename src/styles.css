@@ -102,7 +102,8 @@ textarea.note, .compactNote { min-height: 84px; }
   font-weight: 700;
 }
 
-:where(.primary, .oauth) { border-color: var(--app-primary); background: var(--app-primary); color: var(--app-surface); }
+:where(.primary, .oauth) { border-color: var(--app-primary); background: var(--app-primary); color: var(--app-bg); }
+:where(.primary svg, .oauth svg) { color: currentColor; }
 :where(.secondary:hover, .sourceLink:hover, .topbarAction:hover, .iconButton:hover, .avatarButton:hover, .tagStrip button:hover, .tagCloud button:hover, .addWebhookButton:hover) { border-color: var(--app-primary); background: var(--app-soft); }
 :where(.primary, .secondary, .oauth, .sourceLink) { padding: 0 13px; }
 :where(.secondary.small, .primary.small) { min-height: 32px; padding: 0 10px; font-size: 12px; }
@@ -215,6 +216,7 @@ pre { overflow: auto; margin: 0; padding: 14px; border-radius: var(--mantine-rad
 .loginHeroCopy { max-width: 840px; justify-self: center; text-align: center; }
 .loginHeroCopy h2 { font-size: clamp(42px, 5vw, 72px); line-height: 0.98; letter-spacing: 0; }
 .loginHeroCopy p { font-size: 18px; line-height: 1.6; }
+.loginJoinCue { width: max-content; max-width: 100%; margin: 16px auto -6px; overflow: hidden; color: var(--app-primary); font-family: var(--mantine-font-family-monospace); font-size: 15px; font-weight: 800; line-height: 1.25; text-align: left; white-space: pre; }
 .loginEyebrow { color: var(--app-muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
 .loginPanel { width: min(760px, 100%); justify-self: center; padding: 18px; border: 1px solid var(--app-border); border-radius: var(--mantine-radius-md); background: color-mix(in srgb, var(--app-surface) 98%, transparent); box-shadow: var(--app-shadow); }
 .loginPrimaryAuth, .passkeyLogin, .adminLoginForm { gap: 10px; }
