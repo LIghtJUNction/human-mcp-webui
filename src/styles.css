@@ -1568,10 +1568,76 @@ input {
   gap: 4px;
 }
 
+.agentPage,
+.agentPage .panel,
+.agentPage .panelTitle,
+.agentPage .panelTitle > div,
+.agentPage .copyField,
+.agentPage .guideBody,
+.agentPage .guideBody > section {
+  min-width: 0;
+}
+
+.agentPage {
+  width: min(100%, 1180px);
+}
+
+.agentAccessGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.agentCard {
+  align-content: start;
+}
+
+.agentPage .copyField input {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .agentSecretRow {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) repeat(2, max-content);
   gap: 10px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.agentSecretRow input {
+  min-width: 0;
+}
+
+.agentSecretRow button {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.agentExamplesPanel {
+  overflow: hidden;
+}
+
+.agentExamplesPanel .panelHead > .primary {
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+}
+
+.agentExamplesPanel .guideBody {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.agentExamplesPanel pre {
+  max-width: 100%;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .inlineStatus {
@@ -1655,6 +1721,34 @@ pre {
 
 .settingsGrid input[type="color"] {
   padding: 4px;
+}
+
+.agentDirectoryPolicy .panelHead > .primary {
+  flex: 0 0 auto;
+}
+
+.agentPolicyGrid {
+  grid-template-columns: minmax(220px, 2fr) minmax(140px, 1fr);
+  max-width: 680px;
+}
+
+.agentPolicySummary {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 760px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--border));
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.agentPolicySummary svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--primary);
 }
 
 .quickSettings {
@@ -1821,6 +1915,20 @@ pre {
   }
 }
 
+@media (max-width: 1100px) {
+  .agentPage .agentSecretRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agentPage .agentSecretRow input {
+    grid-column: 1 / -1;
+  }
+
+  .agentPage .agentSecretRow button {
+    width: 100%;
+  }
+}
+
 @media (max-width: 640px) {
   h2 {
     font-size: 22px;
@@ -1860,6 +1968,21 @@ pre {
   .passkeyItem {
     grid-template-columns: 1fr;
   }
+
+  .agentPage {
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .agentAccessGrid,
+  .agentPage .agentSecretRow {
+    grid-template-columns: 1fr;
+  }
+
+  .agentExamplesPanel .panelHead > .primary {
+    width: 100%;
+  }
+
 }
 
 .sidebarActions {

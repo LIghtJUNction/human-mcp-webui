@@ -197,6 +197,8 @@ type PasskeyAuthenticationStart = {
   options: PublicKeyCredentialRequestOptionsJSON;
 };
 
+const appViews = new Set<View>(["inbox", "tasks", "sent", "trash", "directory", "leaderboard", "tags", "agent", "webhooks", "settings", "security"]);
+
 type WebhookConfig = {
   id: string;
   name: string;
@@ -220,11 +222,15 @@ type WebhookConfig = {
   weixin_api_timeout_ms?: number | null;
 };
 
+type AgentDirectoryVisibility = "public_users" | "reputation_at_least" | "self_and_friends" | "self_only";
+
 type AdminSettings = {
   allow_registration: boolean;
   oauth_channels: OAuthChannelConfig[];
   agent_secret_prefix?: string | null;
-  allow_agent_directory: boolean;
+  allow_agent_directory?: boolean;
+  agent_directory_visibility?: AgentDirectoryVisibility;
+  agent_directory_min_reputation?: number;
   webhooks?: WebhookConfig[];
 };
 
@@ -242,7 +248,9 @@ type AgentAccess = {
   agent_secret_prefix: string;
   user_agent_secret: string;
   agent_secret: string;
-  allow_agent_directory: boolean;
+  allow_agent_directory?: boolean;
+  agent_directory_visibility?: AgentDirectoryVisibility;
+  agent_directory_min_reputation?: number;
   friend_code?: string;
   intro_code: string;
   is_public: boolean;
@@ -321,6 +329,36 @@ const oauthPresets = [
     docsUrl: "https://docs.gitlab.com/integration/oauth_provider/"
   }
 ];
+
+const agentDirectoryVisibilityOptions: Array<{
+  value: AgentDirectoryVisibility;
+  labelKey: string;
+  helpKey: string;
+}> = [
+  { value: "public_users", labelKey: "agentDirectoryPublicUsers", helpKey: "agentDirectoryPublicUsersHelp" },
+  { value: "reputation_at_least", labelKey: "agentDirectoryReputation", helpKey: "agentDirectoryReputationHelp" },
+  { value: "self_and_friends", labelKey: "agentDirectoryFriends", helpKey: "agentDirectoryFriendsHelp" },
+  { value: "self_only", labelKey: "agentDirectorySelfOnly", helpKey: "agentDirectorySelfOnlyHelp" }
+];
+
+function normalizedAgentDirectoryVisibility(settings: AdminSettings | null | undefined): AgentDirectoryVisibility {
+  return settings?.agent_directory_visibility ?? (settings?.allow_agent_directory ? "public_users" : "self_only");
+}
+
+function normalizeReputationThreshold(value: unknown) {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) return 5;
+  return Math.min(10, Math.max(0, numeric));
+}
+
+function withAgentDirectoryPolicy(settings: AdminSettings, visibility: AgentDirectoryVisibility, minReputation: number): AdminSettings {
+  return {
+    ...settings,
+    allow_agent_directory: visibility !== "self_only",
+    agent_directory_visibility: visibility,
+    agent_directory_min_reputation: normalizeReputationThreshold(minReputation)
+  };
+}
 
 const zhText: Record<string, string> = {
   online: "在线",
@@ -467,6 +505,18 @@ const zhText: Record<string, string> = {
   personalAgentSecret: "个人 Agent Secret",
   allowAgentDirectory: "允许 Agent 查看整个人才库",
   allowAgentDirectoryRisk: "风险：开启后，任何拿到有效 secret 的 Agent 都可以搜索整个人才库，而不只看到自己的账号。",
+  agentDirectoryVisibility: "Agent 人才库可见范围",
+  agentDirectoryVisibilityHelp: "控制有效 Agent Secret 在 MCP 搜索人才库时能看到哪些账号。",
+  agentDirectoryMode: "可见策略",
+  agentDirectoryPublicUsers: "全部公开用户",
+  agentDirectoryPublicUsersHelp: "可见自己，以及公开出现在人才库的用户。",
+  agentDirectoryReputation: "信誉阈值",
+  agentDirectoryReputationHelp: "可见自己，以及公开且信誉不低于阈值的用户。",
+  agentDirectoryFriends: "自己和好友",
+  agentDirectoryFriendsHelp: "只可见自己和已接受的好友。",
+  agentDirectorySelfOnly: "仅自己",
+  agentDirectorySelfOnlyHelp: "Agent 只能看到 secret 所属账号自己。",
+  agentDirectoryMinReputation: "最低信誉",
   random: "随机生成",
   saveSecret: "保存 secret",
   savingAgent: "正在保存 Agent 访问配置...",
@@ -630,6 +680,18 @@ const enText: Record<string, string> = {
   personalAgentSecret: "Personal Agent Secret",
   allowAgentDirectory: "Allow agents to see the whole talent pool",
   allowAgentDirectoryRisk: "Risk: when enabled, any agent with a valid secret can search the full talent pool instead of only its own account.",
+  agentDirectoryVisibility: "Agent talent pool visibility",
+  agentDirectoryVisibilityHelp: "Controls which accounts a valid Agent Secret can see through MCP talent search.",
+  agentDirectoryMode: "Visibility policy",
+  agentDirectoryPublicUsers: "All public users",
+  agentDirectoryPublicUsersHelp: "Visible: self and users shown publicly in the talent pool.",
+  agentDirectoryReputation: "Reputation threshold",
+  agentDirectoryReputationHelp: "Visible: self and public users whose reputation meets the threshold.",
+  agentDirectoryFriends: "Self and friends",
+  agentDirectoryFriendsHelp: "Visible: self and accepted friends only.",
+  agentDirectorySelfOnly: "Self only",
+  agentDirectorySelfOnlyHelp: "Agents only see the account attached to their secret.",
+  agentDirectoryMinReputation: "Minimum reputation",
   random: "Random",
   saveSecret: "Save secret",
   savingAgent: "Saving agent access...",
@@ -765,11 +827,16 @@ function wsPath(token: string) {
   return url.toString();
 }
 
+function initialView(): View {
+  const value = new URLSearchParams(window.location.search).get("view");
+  return value && appViews.has(value as View) ? (value as View) : "inbox";
+}
+
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem(tokenKey) ?? "");
   const [preferences, setPreferences] = usePreferences();
   const [user, setUser] = useState<User | null>(null);
-  const [view, setView] = useState<View>("inbox");
+  const [view, setView] = useState<View>(initialView);
   const [requests, setRequests] = useState<HumanRequest[]>([]);
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [sent, setSent] = useState<AnsweredRequest[]>([]);
@@ -1828,8 +1895,6 @@ function AgentView({
   const [access, setAccess] = useState<AgentAccess | null>(null);
   const [userSecretDraft, setUserSecretDraft] = useState("");
   const [prefixDraft, setPrefixDraft] = useState("");
-  const [allowDirectoryDraft, setAllowDirectoryDraft] = useState(false);
-  const [riskAccepted, setRiskAccepted] = useState(false);
   const [status, setStatus] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
 
@@ -1839,8 +1904,7 @@ function AgentView({
 
   useEffect(() => {
     setPrefixDraft(settings?.agent_secret_prefix ?? "");
-    setAllowDirectoryDraft(Boolean(settings?.allow_agent_directory));
-  }, [settings?.agent_secret_prefix, settings?.allow_agent_directory]);
+  }, [settings?.agent_secret_prefix]);
 
   useEffect(() => {
     if (access) setUserSecretDraft(access.user_agent_secret ?? "");
@@ -1868,15 +1932,10 @@ function AgentView({
 
   async function saveAdminAgentSettings() {
     if (!settings) return;
-    if (allowDirectoryDraft && !riskAccepted && !settings.allow_agent_directory) {
-      setStatus(t("allowAgentDirectoryRisk"));
-      return;
-    }
     setStatus(t("savingAgent"));
     const next = {
       ...settings,
-      agent_secret_prefix: prefixDraft.trim() || null,
-      allow_agent_directory: allowDirectoryDraft
+      agent_secret_prefix: prefixDraft.trim() || null
     };
     const response = await fetch(apiPath("/api/admin/settings"), {
       method: "POST",
@@ -1898,7 +1957,7 @@ function AgentView({
   const codexSecretEnv = "HUMEN_MCP_SECRET";
   const installPrompt = agentInstallPrompt(mcpUrl, accessKey);
   return (
-    <section className="page">
+    <section className="page agentPage">
       <div className="pageTitle">
         <div>
           <h2>{t("agentTitle")}</h2>
@@ -1909,90 +1968,82 @@ function AgentView({
         </button>
       </div>
 
-      <section className="panel">
-        <div className="panelHead">
-          <div className="panelTitle">
-            <Shield size={18} />
-            <div>
-              <h3>MCP Endpoint</h3>
-              <p>{t("secretMcp")}</p>
-            </div>
-          </div>
-        </div>
-        <label className="copyField">
-          <span>URL</span>
-          <input value={mcpUrl} readOnly onFocus={(event) => event.currentTarget.select()} />
-        </label>
-        <label className="copyField">
-          <span>Agent Secret</span>
-          <input value={accessKey} readOnly onFocus={(event) => event.currentTarget.select()} />
-        </label>
-        <label className="copyField">
-          <span>{t("introCode")}</span>
-          <input value={access?.friend_code ?? access?.intro_code ?? ""} readOnly onFocus={(event) => event.currentTarget.select()} />
-        </label>
-      </section>
-
-      <section className="panel">
-        <div className="panelHead">
-          <div className="panelTitle">
-            <UserCircle size={18} />
-            <div>
-              <h3>{t("personalAgentSecret")}</h3>
-              <p>{t("agentSecretHelp")}</p>
-            </div>
-          </div>
-        </div>
-        <label className="copyField">
-          <span>{t("adminAgentSecret")}</span>
-          <input value={access?.agent_secret_prefix ?? ""} readOnly onFocus={(event) => event.currentTarget.select()} />
-        </label>
-        <div className="agentSecretRow">
-          <input type="password" value={userSecretDraft} onChange={(event) => setUserSecretDraft(event.target.value)} placeholder="Personal secret suffix" />
-          <button className="secondary" onClick={() => setUserSecretDraft(randomSecret().slice(0, 32))}>
-            <RefreshCw size={17} /> {t("random")}
-          </button>
-          <button className="primary" onClick={saveUserSecret}>
-            <Check size={17} /> {t("saveSecret")}
-          </button>
-        </div>
-        {status && <div className={status.endsWith(".") ? "notice" : "notice warning"}>{status}</div>}
-      </section>
-
-      {isAdmin && settings && (
-        <section className="panel">
+      <div className="agentAccessGrid">
+        <section className="panel agentCard">
           <div className="panelHead">
             <div className="panelTitle">
-              <Settings size={18} />
+              <Shield size={18} />
               <div>
-                <h3>{t("adminAgentSecret")}</h3>
+                <h3>MCP Endpoint</h3>
+                <p>{t("secretMcp")}</p>
+              </div>
+            </div>
+          </div>
+          <label className="copyField">
+            <span>URL</span>
+            <input value={mcpUrl} readOnly onFocus={(event) => event.currentTarget.select()} />
+          </label>
+          <label className="copyField">
+            <span>Agent Secret</span>
+            <input value={accessKey} readOnly onFocus={(event) => event.currentTarget.select()} />
+          </label>
+          <label className="copyField">
+            <span>{t("introCode")}</span>
+            <input value={access?.friend_code ?? access?.intro_code ?? ""} readOnly onFocus={(event) => event.currentTarget.select()} />
+          </label>
+        </section>
+
+        <section className="panel agentCard">
+          <div className="panelHead">
+            <div className="panelTitle">
+              <UserCircle size={18} />
+              <div>
+                <h3>{t("personalAgentSecret")}</h3>
                 <p>{t("agentSecretHelp")}</p>
               </div>
             </div>
           </div>
+          <label className="copyField">
+            <span>{t("adminAgentSecret")}</span>
+            <input value={access?.agent_secret_prefix ?? ""} readOnly onFocus={(event) => event.currentTarget.select()} />
+          </label>
           <div className="agentSecretRow">
-            <input type="password" value={prefixDraft} onChange={(event) => setPrefixDraft(event.target.value)} placeholder="Global secret prefix" />
-            <button className="secondary" onClick={() => setPrefixDraft(`humen-${randomSecret().slice(0, 18)}-`)}>
+            <input type="password" value={userSecretDraft} onChange={(event) => setUserSecretDraft(event.target.value)} placeholder="Personal secret suffix" />
+            <button className="secondary" onClick={() => setUserSecretDraft(randomSecret().slice(0, 32))}>
               <RefreshCw size={17} /> {t("random")}
             </button>
-            <button className="primary" onClick={saveAdminAgentSettings}>
+            <button className="primary" onClick={saveUserSecret}>
               <Check size={17} /> {t("saveSecret")}
             </button>
           </div>
-          <label className="toggleRow">
-            <span>{t("allowAgentDirectory")}</span>
-            <input type="checkbox" checked={allowDirectoryDraft} onChange={(event) => setAllowDirectoryDraft(event.target.checked)} />
-          </label>
-          {allowDirectoryDraft && (
-            <label className="toggleRow riskToggle">
-              <span>{t("allowAgentDirectoryRisk")}</span>
-              <input type="checkbox" checked={riskAccepted || settings.allow_agent_directory} onChange={(event) => setRiskAccepted(event.target.checked)} />
-            </label>
-          )}
+          {status && <div className={status.endsWith(".") ? "notice" : "notice warning"}>{status}</div>}
         </section>
-      )}
 
-      <section className="panel">
+        {isAdmin && settings && (
+          <section className="panel agentCard">
+            <div className="panelHead">
+              <div className="panelTitle">
+                <Settings size={18} />
+                <div>
+                  <h3>{t("adminAgentSecret")}</h3>
+                  <p>{t("agentSecretHelp")}</p>
+                </div>
+              </div>
+            </div>
+            <div className="agentSecretRow">
+              <input type="password" value={prefixDraft} onChange={(event) => setPrefixDraft(event.target.value)} placeholder="Global secret prefix" />
+              <button className="secondary" onClick={() => setPrefixDraft(`humen-${randomSecret().slice(0, 18)}-`)}>
+                <RefreshCw size={17} /> {t("random")}
+              </button>
+              <button className="primary" onClick={saveAdminAgentSettings}>
+                <Check size={17} /> {t("saveSecret")}
+              </button>
+            </div>
+          </section>
+        )}
+      </div>
+
+      <section className="panel agentExamplesPanel">
         <div className="panelHead">
           <div className="panelTitle">
             <MessageSquareText size={18} />
@@ -2510,6 +2561,8 @@ function AdminView({
         </label>
       </section>
 
+      <AgentDirectoryPolicyPanel settings={settings} onSave={saveSettings} />
+
       <section className="panel">
         <div className="panelHead">
           <div className="panelTitle">
@@ -2649,6 +2702,78 @@ function AdminView({
           ))}
         </div>
       </section>
+    </section>
+  );
+}
+
+function AgentDirectoryPolicyPanel({
+  settings,
+  onSave
+}: {
+  settings: AdminSettings;
+  onSave: (settings: AdminSettings) => Promise<boolean>;
+}) {
+  const [visibility, setVisibility] = useState<AgentDirectoryVisibility>(() => normalizedAgentDirectoryVisibility(settings));
+  const [minReputation, setMinReputation] = useState(() => String(normalizeReputationThreshold(settings.agent_directory_min_reputation)));
+
+  useEffect(() => {
+    setVisibility(normalizedAgentDirectoryVisibility(settings));
+    setMinReputation(String(normalizeReputationThreshold(settings.agent_directory_min_reputation)));
+  }, [settings.agent_directory_visibility, settings.agent_directory_min_reputation, settings.allow_agent_directory]);
+
+  const selectedOption = agentDirectoryVisibilityOptions.find((option) => option.value === visibility) ?? agentDirectoryVisibilityOptions[0];
+
+  async function savePolicy() {
+    const threshold = normalizeReputationThreshold(Number(minReputation));
+    setMinReputation(String(threshold));
+    await onSave(withAgentDirectoryPolicy(settings, visibility, threshold));
+  }
+
+  return (
+    <section className="panel agentDirectoryPolicy">
+      <div className="panelHead">
+        <div className="panelTitle">
+          <Shield size={18} />
+          <div>
+            <h3>{t("agentDirectoryVisibility")}</h3>
+            <p>{t("agentDirectoryVisibilityHelp")}</p>
+          </div>
+        </div>
+        <button className="primary" onClick={savePolicy}>
+          <Check size={16} /> {t("save")}
+        </button>
+      </div>
+
+      <div className="settingsGrid agentPolicyGrid">
+        <label>
+          <span>{t("agentDirectoryMode")}</span>
+          <select value={visibility} onChange={(event) => setVisibility(event.target.value as AgentDirectoryVisibility)}>
+            {agentDirectoryVisibilityOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {t(option.labelKey)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {visibility === "reputation_at_least" && (
+          <label>
+            <span>{t("agentDirectoryMinReputation")}</span>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              step={0.1}
+              value={minReputation}
+              onChange={(event) => setMinReputation(event.target.value)}
+            />
+          </label>
+        )}
+      </div>
+
+      <div className="agentPolicySummary">
+        <Shield size={16} />
+        <span>{t(selectedOption.helpKey)}</span>
+      </div>
     </section>
   );
 }
