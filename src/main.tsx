@@ -1953,7 +1953,7 @@ function AgentView({
 
   const mcpUrl = normalizeMcpUrl(access?.mcp_url ?? defaultMcpUrl());
   const accessKey = access?.agent_secret ?? "";
-  const headerLine = " -H '" + "x-humen-agent-secret" + ": " + accessKey + "'";
+  const bearerLine = " -H " + shellQuote("Authorization: Bearer " + accessKey);
   const codexSecretEnv = "HUMEN_MCP_SECRET";
   const installPrompt = agentInstallPrompt(mcpUrl, accessKey);
   return (
@@ -2074,7 +2074,7 @@ codex mcp add humen --url ${shellQuote(mcpUrl)} --bearer-token-env-var ${codexSe
     "humen": {
       "url": "${mcpUrl}",
       "headers": {
-        "x-humen-agent-secret": "${accessKey}"
+        "Authorization": "Bearer ${accessKey}"
       }
     }
   }
@@ -2084,17 +2084,17 @@ codex mcp add humen --url ${shellQuote(mcpUrl)} --bearer-token-env-var ${codexSe
             <h4>curl 测试</h4>
             <pre>{`curl '${mcpUrl}' \\
   -H 'content-type: application/json' \\
- ${headerLine} \\
+ ${bearerLine} \\
   --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'`}</pre>
           </section>
           <section>
             <h4>Codex / Claude / 其他 Agent 客户端</h4>
             <ol>
               <li>优先使用 Codex CLI、Claude CLI 或对应客户端自带的 MCP 添加命令 / 设置页。</li>
-              <li>Codex CLI 没有通用自定义 header 参数；请使用 <code>--bearer-token-env-var</code>，服务端会读取 <code>Authorization: Bearer</code>。</li>
+              <li>默认使用标准 Bearer 认证；Codex CLI 请使用 <code>--bearer-token-env-var</code>。</li>
               <li>新增一个名为 <code>humen</code> 的 remote/http MCP server。</li>
               <li>URL 填上面的 MCP Endpoint。</li>
-              <li>支持自定义 headers 的客户端可加入 <code>x-humen-agent-secret</code>，值为上面的完整 Agent Secret。</li>
+              <li>只有客户端无法配置 <code>Authorization: Bearer</code> 时，才使用兼容 header <code>x-humen-agent-secret</code>。</li>
               <li>如果当前是 CLI 工具，请用命令行添加；不要直接编辑配置文件。</li>
               <li>保存后重启 Agent，执行 tools/list 确认能看到 ask_humen 和 create_humen_task。</li>
             </ol>
@@ -3822,7 +3822,7 @@ function shellQuote(value: string) {
 function agentInstallPrompt(mcpUrl: string, accessKey: string) {
   const headerJson = `,
       "headers": {
-        "x-humen-agent-secret": "${accessKey}"
+        "Authorization": "Bearer ${accessKey}"
       }`;
   const codexSecretEnv = "HUMEN_MCP_SECRET";
   const secretLine = "认证信息：Agent Secret = " + accessKey;
@@ -3840,7 +3840,7 @@ function agentInstallPrompt(mcpUrl: string, accessKey: string) {
 MCP URL：${mcpUrl}
 ${secretLine}
 
-如果当前是 Codex CLI，请不要尝试添加自定义 header；此版本 Codex CLI 使用 bearer token 环境变量：
+请优先使用标准 Bearer 认证。Codex CLI 使用 bearer token 环境变量：
 
 export ${codexSecretEnv}=${shellQuote(accessKey)}
 codex mcp add humen --url ${shellQuote(mcpUrl)} --bearer-token-env-var ${codexSecretEnv}
@@ -3858,6 +3858,8 @@ codex mcp remove humen
     }
   }
 }
+
+只有客户端无法配置 Authorization: Bearer 时，才使用兼容 header：x-humen-agent-secret = ${accessKey}
 
 配置后请重启/刷新 MCP 连接，并执行 tools/list 验证能看到 ask_humen、ask_humen_async、ask_humen_text_async、ask_humen_choice_async、ask_humen_judgment_async、read_humen_replies、create_humen_task、list_humen_tasks、list_online_humens、search_humen_profiles、list_humen_tags、rate_humen、report_humen。`;
 }

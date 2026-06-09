@@ -23,6 +23,10 @@
   --shadow-sm: 0 1px 2px rgba(18, 29, 22, 0.07), 0 8px 24px rgba(18, 29, 22, 0.04);
   --shadow-md: 0 14px 42px rgba(18, 29, 22, 0.12);
   --ring: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+  --ascii-ink: color-mix(in srgb, var(--primary) 26%, var(--muted));
+  --ascii-glow: color-mix(in srgb, var(--primary) 16%, transparent);
+  --ascii-grid: color-mix(in srgb, var(--primary) 9%, transparent);
+  --ascii-amber: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--text);
   background: var(--bg);
   color-scheme: light;
@@ -56,6 +60,10 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 32px rgba(0, 0, 0, 0.22);
   --shadow-md: 0 18px 52px rgba(0, 0, 0, 0.36);
   --ring: 0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent);
+  --ascii-ink: color-mix(in srgb, var(--primary) 42%, var(--muted));
+  --ascii-glow: color-mix(in srgb, var(--primary) 20%, transparent);
+  --ascii-grid: color-mix(in srgb, var(--primary) 13%, transparent);
+  --ascii-amber: color-mix(in srgb, var(--accent) 16%, transparent);
   color-scheme: dark;
 }
 
@@ -64,13 +72,92 @@
 }
 
 body {
+  position: relative;
+  isolation: isolate;
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
   background:
+    radial-gradient(circle at 72% 16%, var(--ascii-glow) 0, transparent 31%),
+    radial-gradient(circle at 15% 78%, var(--ascii-amber) 0, transparent 28%),
     linear-gradient(180deg, color-mix(in srgb, var(--surface-soft) 80%, var(--bg)) 0, var(--bg) 310px),
     var(--bg);
   color: var(--text);
+  overflow-x: hidden;
+}
+
+body::before,
+body::after {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+body::before {
+  content: "        humen-mcp          ask_humen             /mcp\A"
+    "   +----------------+   +------------+   +----------------+\A"
+    "   | agent request  |-->| human loop |-->| signed answer  |\A"
+    "   +----------------+   +------------+   +----------------+\A"
+    "        ./inbox          [choice]          {text,image,step}\A"
+    "  01101000 01110101 01101101 01100101 01101110  ::  trust gate\A"
+    "  - - - - - - - - - - - - - - - - - - - - - - - - - - - -\A"
+    "      token -> profile -> tags -> reputation -> route\A"
+    "      >>> wait for operator consent before continuing\A"
+    "        humen-mcp          ask_humen             /mcp\A"
+    "   +----------------+   +------------+   +----------------+\A"
+    "   | agent request  |-->| human loop |-->| signed answer  |\A"
+    "   +----------------+   +------------+   +----------------+\A"
+    "        ./tasks          [judgment]        {yes,no,note}\A"
+    "  01100001 01100111 01100101 01101110 01110100  ::  handoff\A"
+    "  - - - - - - - - - - - - - - - - - - - - - - - - - - - -\A"
+    "      websocket pulse -> deadline -> response -> audit\A"
+    "      >>> keep the model moving with explicit human signal\A"
+    "        humen-mcp          ask_humen             /mcp\A"
+    "   +----------------+   +------------+   +----------------+\A"
+    "   | agent request  |-->| human loop |-->| signed answer  |\A"
+    "   +----------------+   +------------+   +----------------+\A"
+    "        ./directory      [image_review]    {caption,verdict}\A"
+    "  01110011 01100101 01100011 01110010 01100101 01110100  ::  scope\A"
+    "  - - - - - - - - - - - - - - - - - - - - - - - - - - - -\A"
+    "      secret prefix -> public users -> friends -> self only\A"
+    "      >>> route only the accounts this agent can actually see\A";
+  top: -8vh;
+  left: 34vw;
+  width: 1120px;
+  height: 120vh;
+  color: var(--ascii-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.42;
+  opacity: 0.19;
+  white-space: pre;
+  text-shadow: 0 0 18px var(--ascii-glow);
+  transform: rotate(-5deg) translate3d(0, 0, 0);
+  animation: ascii-drift 28s ease-in-out infinite alternate;
+  mask-image: linear-gradient(90deg, transparent 0, #000 12%, #000 72%, transparent 100%);
+}
+
+body::after {
+  content: "";
+  background:
+    linear-gradient(90deg, var(--ascii-grid) 1px, transparent 1px),
+    linear-gradient(180deg, var(--ascii-grid) 1px, transparent 1px),
+    repeating-linear-gradient(180deg, transparent 0 6px, color-mix(in srgb, var(--text) 3%, transparent) 6px 7px);
+  background-size:
+    84px 84px,
+    84px 84px,
+    100% 7px;
+  opacity: 0.48;
+  mask-image: radial-gradient(circle at 68% 22%, #000 0, transparent 68%);
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
 }
 
 button,
@@ -141,7 +228,7 @@ h3 {
   display: grid;
   grid-template-columns: minmax(292px, 360px) 1fr;
   min-height: 100vh;
-  background: var(--bg);
+  background: transparent;
 }
 
 .sidebar {
@@ -151,7 +238,8 @@ h3 {
   padding: 18px;
   border-right: 1px solid var(--border);
   background:
-    linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent) 0%, color-mix(in srgb, var(--surface-soft) 88%, transparent) 100%);
+  backdrop-filter: blur(18px);
   box-shadow: 1px 0 0 color-mix(in srgb, var(--surface) 65%, transparent);
 }
 
@@ -427,8 +515,8 @@ h3 {
   grid-template-rows: auto 1fr;
   min-width: 0;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-soft) 58%, transparent) 0, transparent 260px),
-    var(--bg);
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-soft) 68%, transparent) 0, transparent 280px),
+    color-mix(in srgb, var(--bg) 62%, transparent);
 }
 
 .topbar {
@@ -439,7 +527,7 @@ h3 {
   padding: 12px 24px;
   border-bottom: 1px solid #d9ded6;
   border-bottom-color: var(--border);
-  background: color-mix(in srgb, var(--surface-soft) 92%, transparent);
+  background: color-mix(in srgb, var(--surface-soft) 86%, transparent);
   backdrop-filter: blur(16px);
 }
 
@@ -873,9 +961,8 @@ input {
   min-height: 100vh;
   padding: 20px;
   background:
-    linear-gradient(145deg, color-mix(in srgb, var(--primary) 10%, transparent) 0, transparent 38%),
-    linear-gradient(315deg, color-mix(in srgb, var(--accent) 8%, transparent) 0, transparent 34%),
-    var(--bg);
+    linear-gradient(145deg, color-mix(in srgb, var(--primary) 12%, transparent) 0, transparent 40%),
+    linear-gradient(315deg, color-mix(in srgb, var(--accent) 9%, transparent) 0, transparent 36%);
 }
 
 .loginPanel {
@@ -886,7 +973,8 @@ input {
   border: 1px solid #d9ded6;
   border-radius: 8px;
   border-color: var(--border);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(18px);
   box-shadow: var(--shadow-md);
 }
 
@@ -1854,13 +1942,40 @@ pre {
   animation: spin 0.8s linear infinite;
 }
 
+@keyframes ascii-drift {
+  from {
+    transform: rotate(-5deg) translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: rotate(-5deg) translate3d(-34px, 42px, 0);
+  }
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  .spin {
+    animation: none;
+  }
+}
+
 @media (max-width: 860px) {
+  body::before {
+    top: 8vh;
+    left: 8vw;
+    opacity: 0.12;
+  }
+
+  body::after {
+    opacity: 0.32;
+  }
+
   .shell {
     grid-template-columns: 1fr;
   }
