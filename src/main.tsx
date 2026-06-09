@@ -21,6 +21,7 @@ import {
   Shield,
   Sun,
   Tags,
+  Trophy,
   Trash2,
   UserCircle,
   UserPlus,
@@ -28,10 +29,11 @@ import {
   Webhook,
   X
 } from "lucide-react";
+import logoUrl from "./assets/logo.svg";
 import "./styles.css";
 
 type TaskKind = "choice" | "judgment" | "text" | "image_review" | "steps";
-type View = "inbox" | "tasks" | "sent" | "trash" | "directory" | "tags" | "agent" | "webhooks" | "settings";
+type View = "inbox" | "tasks" | "sent" | "trash" | "directory" | "leaderboard" | "tags" | "agent" | "webhooks" | "settings" | "security";
 
 type HumanRequest = {
   id: string;
@@ -97,6 +99,8 @@ type UserProfile = {
   provider: "password" | "github" | "passkey";
   profile: string;
   tags: string[];
+  reputation: number;
+  ratings_count: number;
   friend_code?: string;
   intro_code: string;
   is_public: boolean;
@@ -118,6 +122,27 @@ type FriendBundle = {
 type TagStat = {
   tag: string;
   count: number;
+};
+
+type HumanLeaderboardEntry = {
+  email: string;
+  requests_handled: number;
+  sent_tokens: number;
+  latest_answered_at?: number | null;
+  reputation: number;
+  ratings_count: number;
+  profile: string;
+  tags: string[];
+  online: boolean;
+};
+
+type HumanReport = {
+  id: string;
+  reporter_email: string;
+  reported_email: string;
+  reason: string;
+  created_at: number;
+  status: string;
 };
 
 type OAuthChannelConfig = {
@@ -203,6 +228,13 @@ type AdminSettings = {
   webhooks?: WebhookConfig[];
 };
 
+type AdminUpdateStatus = {
+  current_version: string;
+  enabled: boolean;
+  running: boolean;
+  timeout_seconds: number;
+};
+
 type AgentAccess = {
   user: string;
   mcp_url: string;
@@ -249,12 +281,23 @@ const defaultPreferences: Preferences = {
   compact: false
 };
 
-const profileTemplate = `Hi, I can help with human-in-the-loop checks.
+const profileTemplateEn = `Hi, I can help with human-in-the-loop checks.
 
 Skills: #review #ops #qa
 Available for: approvals, UI checks, account actions, short research
 Language/timezone:
 Escalation notes:`;
+
+const profileTemplateZh = `你好，我可以协助处理需要人类判断的 Agent 请求。
+
+擅长：#review #ops #qa
+可处理：审批、界面检查、账号操作、简短调研
+语言/时区：
+升级说明：`;
+
+function profileTemplate() {
+  return currentLanguage() === "en" ? profileTemplateEn : profileTemplateZh;
+}
 
 const oauthPresets = [
   {
@@ -286,11 +329,13 @@ const zhText: Record<string, string> = {
   tasks: "任务",
   sent: "成功发送",
   trash: "回收站",
-  directory: "用户目录",
+  directory: "人才库",
+  leaderboard: "排行榜",
   tags: "标签",
   agent: "接入 Agent",
   adminSettings: "管理与设置",
   settings: "设置",
+  security: "安全",
   sourceCode: "GitHub 源代码",
   noPending: "暂无待处理信封",
   noTasks: "暂无 AI 创建的任务",
@@ -329,8 +374,8 @@ const zhText: Record<string, string> = {
   timeout: "超时",
   expired: "已过期",
   clear: "清空",
-  humans: "用户",
-  searchProfile: "搜索简介或 #标签",
+  humans: "人才库",
+  searchProfile: "搜索人才简介或 #标签",
   introCode: "好友代码",
   addByIntroCode: "按好友代码添加好友",
   addFriend: "添加好友",
@@ -340,14 +385,43 @@ const zhText: Record<string, string> = {
   friends: "好友",
   incomingRequests: "收到的申请",
   outgoingRequests: "已发送申请",
-  noHumans: "没有找到用户",
+  noHumans: "没有找到人才",
   noTags: "暂无标签",
   profileMissing: "暂无简介",
   onlineStatus: "在线",
   offlineStatus: "离线",
   settingsSubtitle: "主题、语言和个人显示偏好",
-  adminSubtitle: "个性化、OAuth、注册和用户管理",
+  adminSubtitle: "主题、语言和个人显示偏好",
+  securitySubtitle: "Passkey、注册、OAuth 和用户访问控制",
+  leaderboardSubtitle: "按已处理 Agent 请求数和用户发送 token 量排名",
+  requestsHandled: "处理请求",
+  sentTokens: "用户发送 Token",
+  latestAnswered: "最近处理",
+  reputation: "信誉",
+  ratingsCount: "评分数",
+  rateHuman: "评分",
+  reportHuman: "举报",
+  reportReason: "举报原因",
+  submitReport: "提交举报",
+  submitRating: "提交评分",
+  reportSubmitted: "举报已提交给管理员信箱。",
+  ratingSubmitted: "评分已提交。",
+  adminMailbox: "管理员信箱",
+  noReports: "暂无举报",
+  leaderboardEmpty: "暂无排行榜数据",
+  allHandlers: "上榜人数",
   updatePanel: "更新面板",
+  serverUpdate: "服务器更新",
+  serverUpdateSubtitle: "从 AUR/包管理器更新后端和面板，并重启服务",
+  serverVersion: "服务端",
+  selfUpdateEnabled: "自更新已配置",
+  selfUpdateDisabled: "自更新未配置",
+  startSelfUpdate: "更新服务器",
+  updatingServer: "正在启动更新...",
+  selfUpdateStarted: "更新已启动，服务可能会重启。",
+  selfUpdateFailed: "更新启动失败",
+  confirmServerUpdate: "开始服务器自更新？服务可能会短暂重启。",
+  frontendVersion: "前端",
   update: "更新",
   personalization: "个性化",
   displayName: "显示名",
@@ -359,7 +433,7 @@ const zhText: Record<string, string> = {
   profileHelp: "Agent 可以搜索这个简介和 #标签，建议说明能力、可用时间和注意事项。",
   onboardingTitle: "首次配置",
   onboardingHelp: "完成简介、标签、公开状态和好友代码确认后，Agent 才能稳定地把任务和好友关系关联到你。",
-  publicUser: "公开出现在用户目录",
+  publicUser: "公开出现在人才库",
   privateUserHelp: "关闭公开后，别人只能通过好友代码发送好友申请；好友仍然能看到你。",
   profile: "简介",
   useTemplate: "使用模板",
@@ -391,8 +465,8 @@ const zhText: Record<string, string> = {
   adminAgentSecret: "管理员：Secret 前缀",
   agentSecretHelp: "最终 secret = 管理员前缀 + 你的个人 secret。管理员轮换前缀会让全部旧 secret 失效。",
   personalAgentSecret: "个人 Agent Secret",
-  allowAgentDirectory: "允许 Agent 查看所有人类",
-  allowAgentDirectoryRisk: "风险：开启后，任何拿到有效 secret 的 Agent 都可以搜索全部用户目录，而不只看到自己的账号。",
+  allowAgentDirectory: "允许 Agent 查看整个人才库",
+  allowAgentDirectoryRisk: "风险：开启后，任何拿到有效 secret 的 Agent 都可以搜索整个人才库，而不只看到自己的账号。",
   random: "随机生成",
   saveSecret: "保存 secret",
   savingAgent: "正在保存 Agent 访问配置...",
@@ -418,11 +492,13 @@ const enText: Record<string, string> = {
   tasks: "Tasks",
   sent: "Sent",
   trash: "Trash",
-  directory: "Directory",
+  directory: "Talent Pool",
+  leaderboard: "Leaderboard",
   tags: "Tags",
   agent: "Connect Agent",
   adminSettings: "Admin & Settings",
   settings: "Settings",
+  security: "Security",
   sourceCode: "GitHub source",
   noPending: "No pending envelopes",
   noTasks: "No AI-created tasks",
@@ -461,8 +537,8 @@ const enText: Record<string, string> = {
   timeout: "timeout",
   expired: "expired",
   clear: "Clear",
-  humans: "Humans",
-  searchProfile: "Search profile or #tag",
+  humans: "Talent Pool",
+  searchProfile: "Search talent profile or #tag",
   introCode: "Friend code",
   addByIntroCode: "Add by friend code",
   addFriend: "Add friend",
@@ -472,14 +548,43 @@ const enText: Record<string, string> = {
   friends: "Friends",
   incomingRequests: "Incoming requests",
   outgoingRequests: "Outgoing requests",
-  noHumans: "No humans found",
+  noHumans: "No talent found",
   noTags: "No tags yet",
   profileMissing: "No profile",
   onlineStatus: "online",
   offlineStatus: "offline",
   settingsSubtitle: "Theme, language, and personal display preferences",
-  adminSubtitle: "Personalization, OAuth, registration, and user management",
+  adminSubtitle: "Theme, language, and personal display preferences",
+  securitySubtitle: "Passkeys, registration, OAuth, and user access controls",
+  leaderboardSubtitle: "Ranked by handled agent requests and user-sent token volume",
+  requestsHandled: "Handled requests",
+  sentTokens: "User-sent tokens",
+  latestAnswered: "Latest answer",
+  reputation: "Reputation",
+  ratingsCount: "Ratings",
+  rateHuman: "Rate",
+  reportHuman: "Report",
+  reportReason: "Report reason",
+  submitReport: "Submit report",
+  submitRating: "Submit rating",
+  reportSubmitted: "Report sent to the admin mailbox.",
+  ratingSubmitted: "Rating submitted.",
+  adminMailbox: "Admin mailbox",
+  noReports: "No reports",
+  leaderboardEmpty: "No leaderboard data yet",
+  allHandlers: "Ranked users",
   updatePanel: "Refresh panel",
+  serverUpdate: "Server update",
+  serverUpdateSubtitle: "Update the backend and panel through AUR/package management, then restart the service",
+  serverVersion: "Server",
+  selfUpdateEnabled: "Self-update configured",
+  selfUpdateDisabled: "Self-update not configured",
+  startSelfUpdate: "Update server",
+  updatingServer: "Starting update...",
+  selfUpdateStarted: "Update started. The service may restart.",
+  selfUpdateFailed: "Failed to start update",
+  confirmServerUpdate: "Start server self-update? The service may restart briefly.",
+  frontendVersion: "Frontend",
   update: "Refresh",
   personalization: "Personalization",
   displayName: "Display name",
@@ -491,7 +596,7 @@ const enText: Record<string, string> = {
   profileHelp: "Agents can search this profile and #tags. Include skills, availability, and notes.",
   onboardingTitle: "First-time setup",
   onboardingHelp: "Confirm your profile, tags, public visibility, and friend code so agents and friends map to your account correctly.",
-  publicUser: "Show publicly in the user directory",
+  publicUser: "Show publicly in the talent pool",
   privateUserHelp: "When public is off, others can still send friend requests with your friend code. Friends can still see you.",
   profile: "Profile",
   useTemplate: "Use template",
@@ -523,8 +628,8 @@ const enText: Record<string, string> = {
   adminAgentSecret: "Admin: Secret prefix",
   agentSecretHelp: "Final secret = admin prefix + your personal secret. Rotating the prefix invalidates every old secret.",
   personalAgentSecret: "Personal Agent Secret",
-  allowAgentDirectory: "Allow agents to see all humans",
-  allowAgentDirectoryRisk: "Risk: when enabled, any agent with a valid secret can search the full human directory instead of only its own account.",
+  allowAgentDirectory: "Allow agents to see the whole talent pool",
+  allowAgentDirectoryRisk: "Risk: when enabled, any agent with a valid secret can search the full talent pool instead of only its own account.",
   random: "Random",
   saveSecret: "Save secret",
   savingAgent: "Saving agent access...",
@@ -559,6 +664,101 @@ function apiPath(path: string) {
   return `${base}${path}`;
 }
 
+function panelRootUrl() {
+  return new URL(apiPath("/"), window.location.href).toString();
+}
+
+function normalizePanelAssetUrl(value: string, rootUrl = panelRootUrl()) {
+  try {
+    const url = new URL(value, rootUrl);
+    if (url.origin !== window.location.origin) return null;
+    url.search = "";
+    url.hash = "";
+    return url.pathname;
+  } catch {
+    return null;
+  }
+}
+
+function collectPanelAssets(root: ParentNode, rootUrl = panelRootUrl()) {
+  const assets = [
+    ...Array.from(root.querySelectorAll<HTMLScriptElement>("script[src]")).map((element) => element.getAttribute("src") ?? ""),
+    ...Array.from(root.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href], link[rel="modulepreload"][href]')).map(
+      (element) => element.getAttribute("href") ?? ""
+    )
+  ]
+    .map((asset) => normalizePanelAssetUrl(asset, rootUrl))
+    .filter((asset): asset is string => Boolean(asset));
+  return Array.from(new Set(assets)).sort();
+}
+
+function extractPanelAssets(html: string, rootUrl = panelRootUrl()) {
+  const document = new DOMParser().parseFromString(html, "text/html");
+  return collectPanelAssets(document, rootUrl);
+}
+
+function samePanelAssets(left: string[], right: string[]) {
+  if (left.length !== right.length) return false;
+  const leftSet = new Set(left);
+  return right.every((asset) => leftSet.has(asset));
+}
+
+async function latestPanelAssets() {
+  const url = new URL(panelRootUrl());
+  url.searchParams.set("panel_check", Date.now().toString());
+  const response = await fetch(url.toString(), {
+    cache: "no-store",
+    headers: { "cache-control": "no-cache" }
+  });
+  if (!response.ok) return [];
+  return extractPanelAssets(await response.text(), url.toString());
+}
+
+async function panelUpdateAvailable() {
+  try {
+    const currentAssets = collectPanelAssets(document);
+    const remoteAssets = await latestPanelAssets();
+    return currentAssets.length > 0 && remoteAssets.length > 0 && !samePanelAssets(currentAssets, remoteAssets);
+  } catch (error) {
+    console.warn("Panel update check failed", error);
+    return false;
+  }
+}
+
+function reloadPanel() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("panel_reload", Date.now().toString());
+  window.location.replace(url.toString());
+}
+
+function FrontendVersion() {
+  return (
+    <span className="frontendVersion" title={`humen-mcp-webui ${__APP_COMMIT__}`}>
+      {t("frontendVersion")} {__APP_COMMIT__}
+    </span>
+  );
+}
+
+function BrandLockup() {
+  return (
+    <div className="brandLockup">
+      <img className="appLogo" src={logoUrl} alt="" />
+      <h1>humen-mcp</h1>
+    </div>
+  );
+}
+
+function UpdatePanelControl({ onRefresh, refreshing }: { onRefresh: () => void; refreshing: boolean }) {
+  return (
+    <div className="panelRefreshGroup">
+      <button className="secondary" onClick={onRefresh} disabled={refreshing}>
+        <RefreshCw size={17} className={refreshing ? "spin" : ""} /> {t("updatePanel")}
+      </button>
+      <FrontendVersion />
+    </div>
+  );
+}
+
 function wsPath(token: string) {
   const url = new URL(apiPath(`/api/ws?token=${encodeURIComponent(token)}`), window.location.href);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -576,8 +776,10 @@ function App() {
   const [trash, setTrash] = useState<ExpiredRequest[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<UserProfile[]>([]);
   const [directory, setDirectory] = useState<UserProfile[]>([]);
+  const [leaderboard, setLeaderboard] = useState<HumanLeaderboardEntry[]>([]);
   const [tagStats, setTagStats] = useState<TagStat[]>([]);
   const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
+  const [adminReports, setAdminReports] = useState<HumanReport[]>([]);
   const [adminSettings, setAdminSettings] = useState<AdminSettings | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
@@ -642,6 +844,7 @@ function App() {
         } else {
           refreshSent(token, setSent);
         }
+        refreshLeaderboard(token, setLeaderboard);
       }
       if (message.type === "request_expired") {
         setRequests((current) => current.filter((request) => request.id !== message.id));
@@ -656,6 +859,7 @@ function App() {
       if (message.type === "presence_changed") {
         setOnlineCount(message.online_count);
         refreshUsers(token, setOnlineUsers, setDirectory, setTagStats);
+        refreshLeaderboard(token, setLeaderboard);
       }
     };
     return () => ws.close();
@@ -669,17 +873,26 @@ function App() {
     return () => window.clearTimeout(handle);
   }, [query, token, user]);
 
-  function refreshAll() {
+  async function refreshAll() {
     if (!token) return;
     setBusy(true);
-    Promise.all([
-      refreshRequests(token, setRequests),
-      refreshTasks(token, setTasks),
-      refreshSent(token, setSent),
-      refreshTrash(token, setTrash),
-      refreshUsers(token, setOnlineUsers, setDirectory, setTagStats),
-      refreshAdmin(token, setIsAdmin, setAdminUsers, setAdminSettings)
-    ]).finally(() => setBusy(false));
+    try {
+      if (isAdmin && await panelUpdateAvailable()) {
+        reloadPanel();
+        return;
+      }
+      await Promise.all([
+        refreshRequests(token, setRequests),
+        refreshTasks(token, setTasks),
+        refreshSent(token, setSent),
+        refreshLeaderboard(token, setLeaderboard),
+        refreshTrash(token, setTrash),
+        refreshUsers(token, setOnlineUsers, setDirectory, setTagStats),
+        refreshAdmin(token, setIsAdmin, setAdminUsers, setAdminSettings, setAdminReports)
+      ]);
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (!token || !user) {
@@ -691,7 +904,7 @@ function App() {
       <aside className="sidebar">
         <div className="brand">
           <div>
-            <h1>humen-mcp</h1>
+            <BrandLockup />
             <p>{onlineCount} {t(t("onlineStatus"))}</p>
           </div>
           <button className="iconButton" title={t("refresh")} onClick={refreshAll}>
@@ -705,9 +918,11 @@ function App() {
           <NavButton icon={<Send size={18} />} label={t("sent")} count={sent.length} active={view === "sent"} onClick={() => setView("sent")} />
           <NavButton icon={<Trash2 size={18} />} label={t("trash")} count={trash.length} active={view === "trash"} onClick={() => setView("trash")} />
           <NavButton icon={<Users size={18} />} label={t("directory")} count={onlineUsers.length} active={view === "directory"} onClick={() => setView("directory")} />
+          <NavButton icon={<Trophy size={18} />} label={t("leaderboard")} count={leaderboard.length} active={view === "leaderboard"} onClick={() => setView("leaderboard")} />
           <NavButton icon={<Tags size={18} />} label={t("tags")} count={tagStats.length} active={view === "tags"} onClick={() => setView("tags")} />
           <NavButton icon={<MessageSquareText size={18} />} label={t("agent")} active={view === "agent"} onClick={() => setView("agent")} />
-          <NavButton icon={isAdmin ? <Shield size={18} /> : <Settings size={18} />} label={isAdmin ? t("adminSettings") : t("settings")} active={view === "settings"} onClick={() => setView("settings")} />
+          <NavButton icon={<Settings size={18} />} label={t("settings")} active={view === "settings"} onClick={() => setView("settings")} />
+          <NavButton icon={<Shield size={18} />} label={t("security")} active={view === "security"} onClick={() => setView("security")} />
         </nav>
 
         {view === "inbox" && (
@@ -793,7 +1008,11 @@ function App() {
         {view === "tasks" && <AgentTasksView tasks={tasks} token={token} setTasks={setTasks} />}
         {view === "sent" && <SentView sent={sent} />}
         {view === "trash" && <TrashView trash={trash} token={token} setTrash={setTrash} />}
-        {view === "directory" && <DirectoryView query={query} setQuery={setQuery} users={directory} tags={tagStats} token={token} currentUser={user.email} onChanged={() => refreshUsers(token, setOnlineUsers, setDirectory, setTagStats)} />}
+        {view === "directory" && <DirectoryView query={query} setQuery={setQuery} users={directory} tags={tagStats} token={token} currentUser={user.email} onChanged={() => {
+          refreshUsers(token, setOnlineUsers, setDirectory, setTagStats);
+          refreshLeaderboard(token, setLeaderboard);
+        }} />}
+        {view === "leaderboard" && <LeaderboardView entries={leaderboard} token={token} setEntries={setLeaderboard} />}
         {view === "tags" && <TagsView tags={tagStats} setQuery={setQuery} setView={setView} />}
         {view === "agent" && (
           <AgentView
@@ -811,34 +1030,31 @@ function App() {
           />
         )}
         {view === "webhooks" && (!isAdmin || !adminSettings) && <Blank text="Only administrators can manage webhooks" />}
-        {view === "settings" && isAdmin && (
+        {view === "settings" && (
+          <AccountView token={token} user={user} preferences={preferences} setPreferences={setPreferences} />
+        )}
+        {view === "security" && isAdmin && (
           adminSettings ? (
             <AdminView
               token={token}
-              user={user}
-              preferences={preferences}
-              setPreferences={setPreferences}
               users={adminUsers}
               settings={adminSettings}
+              reports={adminReports}
               setUsers={setAdminUsers}
               setSettings={setAdminSettings}
+              setReports={setAdminReports}
               onRefresh={refreshAll}
               refreshing={busy}
             />
           ) : (
-            <AccountView
+            <SecurityView
               token={token}
-              user={user}
-              preferences={preferences}
-              setPreferences={setPreferences}
-              onRefresh={refreshAll}
-              refreshing={busy}
               notice="Admin APIs are not available on this backend version yet."
             />
           )
         )}
-        {view === "settings" && !isAdmin && (
-          <AccountView token={token} user={user} preferences={preferences} setPreferences={setPreferences} onRefresh={refreshAll} refreshing={busy} />
+        {view === "security" && !isAdmin && (
+          <SecurityView token={token} />
         )}
       </section>
     </main>
@@ -929,7 +1145,7 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
     <main className="loginShell">
       <form className="loginPanel" onSubmit={submit}>
         <div className="loginHead">
-          <h1>humen-mcp</h1>
+          <BrandLockup />
           <SourceLink />
         </div>
         <label>
@@ -1211,6 +1427,90 @@ function TrashView({ trash, token, setTrash }: { trash: ExpiredRequest[]; token:
   );
 }
 
+function LeaderboardView({
+  entries,
+  token,
+  setEntries
+}: {
+  entries: HumanLeaderboardEntry[];
+  token: string;
+  setEntries: (entries: HumanLeaderboardEntry[]) => void;
+}) {
+  const totalRequests = entries.reduce((sum, entry) => sum + entry.requests_handled, 0);
+  const totalTokens = entries.reduce((sum, entry) => sum + entry.sent_tokens, 0);
+
+  async function refresh() {
+    await refreshLeaderboard(token, setEntries);
+  }
+
+  return (
+    <section className="page leaderboardPage">
+      <div className="pageTitle">
+        <div>
+          <h2>{t("leaderboard")}</h2>
+          <p>{t("leaderboardSubtitle")}</p>
+        </div>
+        <button className="secondary" onClick={refresh}>
+          <RefreshCw size={17} /> {t("refresh")}
+        </button>
+      </div>
+
+      <div className="leaderboardStats">
+        <article className="metricPanel">
+          <span>{t("allHandlers")}</span>
+          <strong>{entries.length}</strong>
+        </article>
+        <article className="metricPanel">
+          <span>{t("requestsHandled")}</span>
+          <strong>{formatNumber(totalRequests)}</strong>
+        </article>
+        <article className="metricPanel">
+          <span>{t("sentTokens")}</span>
+          <strong>{formatCompactNumber(totalTokens)}</strong>
+        </article>
+      </div>
+
+      <div className="leaderboardList">
+        {entries.map((entry, index) => (
+          <article className="leaderboardRow" key={entry.email}>
+            <div className="rankBadge">#{index + 1}</div>
+            <div className="leaderIdentity">
+              <div className="avatarCircle">{initials(entry.email)}</div>
+              <div>
+                <strong>{entry.email}</strong>
+                <p>{entry.profile || t("profileMissing")}</p>
+                <div className="tagRow">{entry.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+              </div>
+            </div>
+            <div className="leaderMetrics">
+              <span>
+                <strong>{formatNumber(entry.requests_handled)}</strong>
+                {t("requestsHandled")}
+              </span>
+              <span>
+                <strong>{formatCompactNumber(entry.sent_tokens)}</strong>
+                {t("sentTokens")}
+              </span>
+              <span>
+                <strong>{entry.latest_answered_at ? formatTime(entry.latest_answered_at) : "-"}</strong>
+                {t("latestAnswered")}
+              </span>
+              <span>
+                <strong>{formatScore(entry.reputation)}</strong>
+                {t("reputation")} · {entry.ratings_count}
+              </span>
+              <span className={entry.online ? "status onlineStatus" : "status"}>
+                {entry.online ? t("onlineStatus") : t("offlineStatus")}
+              </span>
+            </div>
+          </article>
+        ))}
+        {entries.length === 0 && <Blank text={t("leaderboardEmpty")} />}
+      </div>
+    </section>
+  );
+}
+
 type TaskFilter = "active" | "all" | AgentTaskStatus;
 
 function AgentTasksView({
@@ -1457,10 +1757,12 @@ function DirectoryView({
           <UserCard
             key={profile.email}
             profile={profile}
+            token={token}
             currentUser={currentUser}
             onAdd={(email) => createFriendRequest({ email })}
             onAccept={acceptFriend}
             onRemove={removeFriend}
+            onChanged={onChanged}
           />
         ))}
         {users.length === 0 && <Blank text={t("noHumans")} />}
@@ -1593,6 +1895,7 @@ function AgentView({
   const mcpUrl = normalizeMcpUrl(access?.mcp_url ?? defaultMcpUrl());
   const accessKey = access?.agent_secret ?? "";
   const headerLine = " -H '" + "x-humen-agent-secret" + ": " + accessKey + "'";
+  const codexSecretEnv = "HUMEN_MCP_SECRET";
   const installPrompt = agentInstallPrompt(mcpUrl, accessKey);
   return (
     <section className="page">
@@ -1709,6 +2012,11 @@ function AgentView({
             <pre>{installPrompt}</pre>
           </section>
           <section>
+            <h4>Codex CLI</h4>
+            <pre>{`export ${codexSecretEnv}=${shellQuote(accessKey)}
+codex mcp add humen --url ${shellQuote(mcpUrl)} --bearer-token-env-var ${codexSecretEnv}`}</pre>
+          </section>
+          <section>
             <h4>通用 MCP JSON（仅用于客户端导入或设置页）</h4>
             <pre>{`{
   "mcpServers": {
@@ -1732,9 +2040,10 @@ function AgentView({
             <h4>Codex / Claude / 其他 Agent 客户端</h4>
             <ol>
               <li>优先使用 Codex CLI、Claude CLI 或对应客户端自带的 MCP 添加命令 / 设置页。</li>
+              <li>Codex CLI 没有通用自定义 header 参数；请使用 <code>--bearer-token-env-var</code>，服务端会读取 <code>Authorization: Bearer</code>。</li>
               <li>新增一个名为 <code>humen</code> 的 remote/http MCP server。</li>
               <li>URL 填上面的 MCP Endpoint。</li>
-              <li>headers 里加入 <code>x-humen-agent-secret</code>，值为上面的完整 Agent Secret。</li>
+              <li>支持自定义 headers 的客户端可加入 <code>x-humen-agent-secret</code>，值为上面的完整 Agent Secret。</li>
               <li>如果当前是 CLI 工具，请用命令行添加；不要直接编辑配置文件。</li>
               <li>保存后重启 Agent，执行 tools/list 确认能看到 ask_humen 和 create_humen_task。</li>
             </ol>
@@ -2037,24 +2346,22 @@ function weixinStatusLabel(webhook: WebhookConfig) {
 
 function AdminView({
   token,
-  user,
-  preferences,
-  setPreferences,
   users,
+  reports,
   settings,
   setUsers,
   setSettings,
+  setReports,
   onRefresh,
   refreshing
 }: {
   token: string;
-  user: User;
-  preferences: Preferences;
-  setPreferences: (preferences: Preferences) => void;
   users: UserProfile[];
+  reports: HumanReport[];
   settings: AdminSettings;
   setUsers: (users: UserProfile[]) => void;
   setSettings: (settings: AdminSettings) => void;
+  setReports: (reports: HumanReport[]) => void;
   onRefresh: () => void;
   refreshing: boolean;
 }) {
@@ -2062,6 +2369,49 @@ function AdminView({
   const [oauthClientId, setOauthClientId] = useState("");
   const [settingsStatus, setSettingsStatus] = useState("");
   const [oauthStatus, setOauthStatus] = useState<Record<string, string>>({});
+  const [updateStatus, setUpdateStatus] = useState<AdminUpdateStatus | null>(null);
+  const [updateMessage, setUpdateMessage] = useState("");
+  const [updateBusy, setUpdateBusy] = useState(false);
+
+  useEffect(() => {
+    refreshUpdateStatus();
+  }, [token]);
+
+  async function refreshUpdateStatus() {
+    const response = await fetch(apiPath("/api/admin/update"), { headers: authHeaders(token) });
+    const data = await safeJson<AdminUpdateStatus>(response);
+    if (data) setUpdateStatus(data);
+  }
+
+  async function startSelfUpdate() {
+    if (!window.confirm(t("confirmServerUpdate"))) return;
+    setUpdateBusy(true);
+    setUpdateMessage(t("updatingServer"));
+    try {
+      const response = await fetch(apiPath("/api/admin/update"), {
+        method: "POST",
+        headers: authHeaders(token)
+      });
+      if (!response.ok) {
+        setUpdateMessage((await safeError(response)) || t("selfUpdateFailed"));
+        await refreshUpdateStatus();
+        return;
+      }
+      await safeJson<{ message?: string }>(response);
+      setUpdateMessage(t("selfUpdateStarted"));
+      await refreshUpdateStatus();
+      window.setTimeout(() => {
+        panelUpdateAvailable()
+          .then((available) => {
+            if (available) reloadPanel();
+            else refreshUpdateStatus();
+          })
+          .catch(() => refreshUpdateStatus());
+      }, 8000);
+    } finally {
+      setUpdateBusy(false);
+    }
+  }
 
   async function saveSettings(next: AdminSettings) {
     setSettingsStatus(t("saving"));
@@ -2113,17 +2463,37 @@ function AdminView({
     <section className="page adminPage">
       <div className="pageTitle">
         <div>
-          <h2>{t("settings")}</h2>
-          <p>{t("adminSubtitle")}</p>
+          <h2>{t("security")}</h2>
+          <p>{t("securitySubtitle")}</p>
         </div>
-        <button className="secondary" onClick={onRefresh} disabled={refreshing}>
-          <RefreshCw size={17} className={refreshing ? "spin" : ""} /> {t("updatePanel")}
-        </button>
+        <UpdatePanelControl onRefresh={onRefresh} refreshing={refreshing} />
       </div>
 
-      <PersonalizationPanel user={user} preferences={preferences} setPreferences={setPreferences} />
-      <ProfilePanel token={token} />
+      <PasskeyPanel token={token} />
       {settingsStatus && <div className={settingsStatus === t("saved") ? "notice" : "notice warning"}>{settingsStatus}</div>}
+
+      <AdminReportsPanel token={token} reports={reports} setReports={setReports} />
+
+      <section className="panel">
+        <div className="panelHead">
+          <div className="panelTitle">
+            <RefreshCw size={18} />
+            <div>
+              <h3>{t("serverUpdate")}</h3>
+              <p>{t("serverUpdateSubtitle")}</p>
+            </div>
+          </div>
+          <button className="primary" onClick={startSelfUpdate} disabled={updateBusy || updateStatus?.running || !updateStatus?.enabled}>
+            <RefreshCw size={16} className={updateBusy || updateStatus?.running ? "spin" : ""} /> {updateBusy || updateStatus?.running ? t("updatingServer") : t("startSelfUpdate")}
+          </button>
+        </div>
+        <div className="metaRow updateMeta">
+          <span>{t("serverVersion")} {updateStatus?.current_version ?? "unknown"}</span>
+          <span>{updateStatus?.enabled ? t("selfUpdateEnabled") : t("selfUpdateDisabled")}</span>
+          <FrontendVersion />
+        </div>
+        {updateMessage && <div className={updateMessage === t("updatingServer") || updateMessage === t("selfUpdateStarted") ? "notice" : "notice warning"}>{updateMessage}</div>}
+      </section>
 
       <section className="panel">
         <div className="panelHead">
@@ -2275,10 +2645,45 @@ function AdminView({
         </div>
         <div className="userTable">
           {users.map((profile) => (
-            <AdminUserRow key={`${profile.provider}:${profile.email}`} profile={profile} token={token} afterChange={() => refreshAdmin(token, () => {}, setUsers, setSettings)} />
+            <AdminUserRow key={`${profile.provider}:${profile.email}`} profile={profile} token={token} afterChange={() => refreshAdmin(token, () => {}, setUsers, setSettings, setReports)} />
           ))}
         </div>
       </section>
+    </section>
+  );
+}
+
+function AdminReportsPanel({ token, reports, setReports }: { token: string; reports: HumanReport[]; setReports: (reports: HumanReport[]) => void }) {
+  async function refresh() {
+    const response = await fetch(apiPath("/api/admin/reports"), { headers: authHeaders(token) });
+    setReports((await safeJson<HumanReport[]>(response)) ?? []);
+  }
+
+  return (
+    <section className="panel">
+      <div className="panelHead">
+        <div className="panelTitle">
+          <Ban size={18} />
+          <h3>{t("adminMailbox")}</h3>
+        </div>
+        <button className="secondary small" onClick={refresh}>
+          <RefreshCw size={15} /> {t("update")}
+        </button>
+      </div>
+      <div className="reportList">
+        {reports.map((report) => (
+          <article className="reportItem" key={report.id}>
+            <div className="metaRow">
+              <strong>{report.reported_email}</strong>
+              <span>{formatTime(report.created_at)}</span>
+              <span>{report.status}</span>
+            </div>
+            <p>{report.reason}</p>
+            <small>{report.reporter_email}</small>
+          </article>
+        ))}
+        {reports.length === 0 && <Blank text={t("noReports")} />}
+      </div>
     </section>
   );
 }
@@ -2436,16 +2841,12 @@ function AccountView({
   user,
   preferences,
   setPreferences,
-  onRefresh,
-  refreshing,
   notice
 }: {
   token: string;
   user: User;
   preferences: Preferences;
   setPreferences: (preferences: Preferences) => void;
-  onRefresh: () => void;
-  refreshing: boolean;
   notice?: string;
 }) {
   return (
@@ -2455,13 +2856,32 @@ function AccountView({
           <h2>{t("settings")}</h2>
           <p>{t("settingsSubtitle")}</p>
         </div>
-        <button className="secondary" onClick={onRefresh} disabled={refreshing}>
-          <RefreshCw size={17} className={refreshing ? "spin" : ""} /> {t("updatePanel")}
-        </button>
+        <FrontendVersion />
       </div>
       {notice && <div className="notice">{notice}</div>}
       <PersonalizationPanel user={user} preferences={preferences} setPreferences={setPreferences} />
       <ProfilePanel token={token} />
+    </section>
+  );
+}
+
+function SecurityView({
+  token,
+  notice
+}: {
+  token: string;
+  notice?: string;
+}) {
+  return (
+    <section className="page">
+      <div className="pageTitle">
+        <div>
+          <h2>{t("security")}</h2>
+          <p>{t("securitySubtitle")}</p>
+        </div>
+        <FrontendVersion />
+      </div>
+      {notice && <div className="notice">{notice}</div>}
       <PasskeyPanel token={token} />
     </section>
   );
@@ -2557,7 +2977,8 @@ function PersonalizationPanel({
 }
 
 function ProfilePanel({ token }: { token: string }) {
-  const [profile, setProfile] = useState(profileTemplate);
+  const template = profileTemplate();
+  const [profile, setProfile] = useState(template);
   const [tags, setTags] = useState("");
   const [introCode, setIntroCode] = useState("");
   const [isPublic, setIsPublic] = useState(false);
@@ -2569,14 +2990,14 @@ function ProfilePanel({ token }: { token: string }) {
       .then((response) => safeJson<UserProfile>(response))
       .then((data) => {
         if (!data) return;
-        setProfile(data.profile || profileTemplate);
+        setProfile(data.profile || template);
         setTags(data.tags.join(" "));
         setIntroCode(data.friend_code ?? data.intro_code ?? "");
         setIsPublic(Boolean(data.is_public));
         setOnboardingCompleted(Boolean(data.onboarding_completed));
       })
       .catch(() => {});
-  }, [token]);
+  }, [token, template]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -2597,7 +3018,7 @@ function ProfilePanel({ token }: { token: string }) {
     }
     const data = await safeJson<UserProfile>(response);
     if (data) {
-      setProfile(data.profile || profileTemplate);
+      setProfile(data.profile || template);
       setTags(data.tags.join(" "));
       setIntroCode(data.friend_code ?? data.intro_code ?? "");
       setIsPublic(Boolean(data.is_public));
@@ -2637,14 +3058,14 @@ function ProfilePanel({ token }: { token: string }) {
         </label>
         <label>
           <span>{t("profile")}</span>
-          <textarea value={profile} onChange={(event) => setProfile(event.target.value)} placeholder={profileTemplate} />
+          <textarea value={profile} onChange={(event) => setProfile(event.target.value)} placeholder={template} />
         </label>
         <label>
           <span>标签</span>
           <input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="#review #ops #qa" />
         </label>
         <div className="rowActions">
-          <button className="secondary" type="button" onClick={() => setProfile(profileTemplate)}>
+          <button className="secondary" type="button" onClick={() => setProfile(template)}>
             {t("useTemplate")}
           </button>
           <button className="primary" type="submit">
@@ -2786,19 +3207,75 @@ function PasskeyPanel({ token }: { token: string }) {
 
 function UserCard({
   profile,
+  token,
   currentUser,
   onAdd,
   onAccept,
-  onRemove
+  onRemove,
+  onChanged
 }: {
   profile: UserProfile;
+  token?: string;
   currentUser?: string;
   onAdd?: (email: string) => void;
   onAccept?: (email: string) => void;
   onRemove?: (email: string) => void;
+  onChanged?: () => void;
 }) {
+  const [mode, setMode] = useState<"idle" | "rate" | "report">("idle");
+  const [score, setScore] = useState(5);
+  const [reason, setReason] = useState("");
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
   const banned = profile.ban_expires_at && profile.ban_expires_at > Math.floor(Date.now() / 1000);
   const isSelf = currentUser ? profile.email.toLowerCase() === currentUser.toLowerCase() : false;
+  const canReview = Boolean(token) && !isSelf;
+
+  async function submitRating() {
+    if (!token) return;
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch(apiPath("/api/humans/rate"), {
+        method: "POST",
+        headers: { ...authHeaders(token), "content-type": "application/json" },
+        body: JSON.stringify({ rated_email: profile.email, score })
+      });
+      if (!response.ok) {
+        setStatus((await safeError(response)) || t("saveFailed"));
+        return;
+      }
+      setStatus(t("ratingSubmitted"));
+      setMode("idle");
+      onChanged?.();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitReport() {
+    if (!token || !reason.trim()) return;
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch(apiPath("/api/humans/report"), {
+        method: "POST",
+        headers: { ...authHeaders(token), "content-type": "application/json" },
+        body: JSON.stringify({ reported_email: profile.email, reason: reason.trim() })
+      });
+      if (!response.ok) {
+        setStatus((await safeError(response)) || t("saveFailed"));
+        return;
+      }
+      setReason("");
+      setStatus(t("reportSubmitted"));
+      setMode("idle");
+      onChanged?.();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <article className="userCard">
       <div className="avatarCircle">{initials(profile.email)}</div>
@@ -2808,6 +3285,7 @@ function UserCard({
         <div className="metaRow">
           <span className={profile.online ? "status onlineStatus" : "status"}>{profile.online ? t("onlineStatus") : t("offlineStatus")}</span>
           <span>{profile.provider}</span>
+          <span>{t("reputation")} {formatScore(profile.reputation)} ({profile.ratings_count ?? 0})</span>
           {profile.is_public && <span>{currentLanguage() === "zh" ? "公开" : "Public"}</span>}
           {banned && <span className="dangerText">banned until {formatTime(profile.ban_expires_at!)}</span>}
         </div>
@@ -2836,8 +3314,38 @@ function UserCard({
                 <UserPlus size={15} /> {t("addFriend")}
               </button>
             )}
+            {canReview && (
+              <>
+                <button className="secondary small" onClick={() => setMode(mode === "rate" ? "idle" : "rate")}>
+                  <Check size={15} /> {t("rateHuman")}
+                </button>
+                <button className="secondary small" onClick={() => setMode(mode === "report" ? "idle" : "report")}>
+                  <Ban size={15} /> {t("reportHuman")}
+                </button>
+              </>
+            )}
           </div>
         )}
+        {canReview && mode === "rate" && (
+          <div className="reviewBox">
+            <label>
+              <span>{t("rateHuman")} {score}/10</span>
+              <input type="range" min="0" max="10" step="1" value={score} onChange={(event) => setScore(Number(event.target.value))} />
+            </label>
+            <button className="primary small" onClick={submitRating} disabled={busy}>
+              <Check size={15} /> {t("submitRating")}
+            </button>
+          </div>
+        )}
+        {canReview && mode === "report" && (
+          <div className="reviewBox">
+            <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("reportReason")} />
+            <button className="primary small" onClick={submitReport} disabled={busy || !reason.trim()}>
+              <Ban size={15} /> {t("submitReport")}
+            </button>
+          </div>
+        )}
+        {status && <div className={status.endsWith(".") || status.endsWith("。") ? "inlineStatus" : "notice warning"}>{status}</div>}
       </div>
     </article>
   );
@@ -3027,6 +3535,12 @@ async function refreshSent(token: string, setSent: (sent: AnsweredRequest[]) => 
   setSent(data ? sortAnswered(data) : []);
 }
 
+async function refreshLeaderboard(token: string, setLeaderboard: (entries: HumanLeaderboardEntry[]) => void) {
+  const response = await fetch(apiPath("/api/stats/leaderboard"), { headers: authHeaders(token) });
+  const data = await safeJson<HumanLeaderboardEntry[]>(response);
+  setLeaderboard(data ?? []);
+}
+
 async function refreshTrash(token: string, setTrash: (trash: ExpiredRequest[]) => void) {
   const response = await fetch(apiPath("/api/trash"), { headers: authHeaders(token) });
   const data = await safeJson<ExpiredRequest[]>(response);
@@ -3053,19 +3567,29 @@ async function refreshDirectory(token: string, setDirectory: (users: UserProfile
   setDirectory((await safeJson<UserProfile[]>(response)) ?? []);
 }
 
-async function refreshAdmin(token: string, setIsAdmin: (isAdmin: boolean) => void, setUsers: (users: UserProfile[]) => void, setSettings: (settings: AdminSettings) => void) {
-  const [users, settings] = await Promise.all([
+async function refreshAdmin(
+  token: string,
+  setIsAdmin: (isAdmin: boolean) => void,
+  setUsers: (users: UserProfile[]) => void,
+  setSettings: (settings: AdminSettings) => void,
+  setReports: (reports: HumanReport[]) => void = () => {}
+) {
+  const [users, settings, reports] = await Promise.all([
     fetch(apiPath("/api/admin/users"), { headers: authHeaders(token) }),
-    fetch(apiPath("/api/admin/settings"), { headers: authHeaders(token) })
+    fetch(apiPath("/api/admin/settings"), { headers: authHeaders(token) }),
+    fetch(apiPath("/api/admin/reports"), { headers: authHeaders(token) })
   ]);
   const usersData = await safeJson<UserProfile[]>(users);
   const settingsData = await safeJson<AdminSettings>(settings);
+  const reportsData = await safeJson<HumanReport[]>(reports);
   if (usersData && settingsData) {
     setIsAdmin(true);
     setUsers(usersData);
     setSettings(settingsData);
+    setReports(reportsData ?? []);
   } else {
     setIsAdmin(false);
+    setReports([]);
   }
 }
 
@@ -3166,12 +3690,17 @@ function normalizeMcpUrl(value: string) {
   return url.toString();
 }
 
+function shellQuote(value: string) {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
 function agentInstallPrompt(mcpUrl: string, accessKey: string) {
   const headerJson = `,
       "headers": {
         "x-humen-agent-secret": "${accessKey}"
       }`;
-  const secretLine = "必须带请求头：" + "x-humen-agent-secret" + ": " + accessKey;
+  const codexSecretEnv = "HUMEN_MCP_SECRET";
+  const secretLine = "认证信息：Agent Secret = " + accessKey;
   return `请帮我把 humen-mcp 配置成一个 remote/http MCP server。
 
 请先判断你当前使用的是哪种 Agent 工具或客户端，并使用它自带的 MCP 添加方式：
@@ -3186,6 +3715,15 @@ function agentInstallPrompt(mcpUrl: string, accessKey: string) {
 MCP URL：${mcpUrl}
 ${secretLine}
 
+如果当前是 Codex CLI，请不要尝试添加自定义 header；此版本 Codex CLI 使用 bearer token 环境变量：
+
+export ${codexSecretEnv}=${shellQuote(accessKey)}
+codex mcp add humen --url ${shellQuote(mcpUrl)} --bearer-token-env-var ${codexSecretEnv}
+
+如果已存在同名 humen 配置，请先用 Codex CLI 命令移除旧配置：
+
+codex mcp remove humen
+
 如果客户端只能通过 mcpServers JSON 导入或设置页添加，请使用下面内容；不要因为这个示例去手动编辑配置文件：
 
 {
@@ -3196,7 +3734,7 @@ ${secretLine}
   }
 }
 
-配置后请重启/刷新 MCP 连接，并执行 tools/list 验证能看到 ask_humen、ask_humen_async、ask_humen_text_async、ask_humen_choice_async、ask_humen_judgment_async、read_humen_replies、create_humen_task、list_humen_tasks、list_online_humens、search_humen_profiles、list_humen_tags。`;
+配置后请重启/刷新 MCP 连接，并执行 tools/list 验证能看到 ask_humen、ask_humen_async、ask_humen_text_async、ask_humen_choice_async、ask_humen_judgment_async、read_humen_replies、create_humen_task、list_humen_tasks、list_online_humens、search_humen_profiles、list_humen_tags、rate_humen、report_humen。`;
 }
 
 async function copyToClipboard(text: string, setStatus: (status: string) => void) {
@@ -3268,6 +3806,18 @@ function formatAge(seconds: number) {
 
 function formatTime(unix: number) {
   return new Date(unix * 1000).toLocaleString();
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat().format(value);
+}
+
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function formatScore(value: number | null | undefined) {
+  return new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value ?? 5);
 }
 
 function logout(
