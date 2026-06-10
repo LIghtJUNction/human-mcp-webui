@@ -189,6 +189,14 @@ type PublicKeyCredentialRequestOptionsJSON = Omit<
   allowCredentials?: PublicKeyCredentialDescriptorJSON[];
 };
 
+type PublicKeyCredentialCreationOptionsPayload = PublicKeyCredentialCreationOptionsJSON | {
+  publicKey: PublicKeyCredentialCreationOptionsJSON;
+};
+
+type PublicKeyCredentialRequestOptionsPayload = PublicKeyCredentialRequestOptionsJSON | {
+  publicKey: PublicKeyCredentialRequestOptionsJSON;
+};
+
 type AuthConfig = {
   github_enabled: boolean;
   passkey_enabled?: boolean;
@@ -205,12 +213,12 @@ type PasskeyInfo = {
 
 type PasskeyRegistrationStart = {
   registration_id: string;
-  options: PublicKeyCredentialCreationOptionsJSON;
+  options: PublicKeyCredentialCreationOptionsPayload;
 };
 
 type PasskeyAuthenticationStart = {
   authentication_id: string;
-  options: PublicKeyCredentialRequestOptionsJSON;
+  options: PublicKeyCredentialRequestOptionsPayload;
 };
 
 const appViews = new Set<View>(["inbox", "tasks", "sent", "trash", "directory", "leaderboard", "tags", "agent", "webhooks", "settings", "security"]);
@@ -435,9 +443,12 @@ const zhText: Record<string, string> = {
   loginWithOAuth: "使用 OAuth 登录",
   oauthUnavailable: "OAuth 登录尚未开通，请联系管理员开通账号。",
   passkeyAccess: "已绑定 Passkey？",
-  loginHeroTitle: "Agents的人才库",
-  loginHeroSubtitle: "humen-mcp 把 Codex、Claude Code 等 Agent 的阻塞问题路由给在线用户，回答后再让 Agent 继续执行。",
-  loginHeroJoinCue: "嘿人类，快加入人才库",
+  loginHeroTitle: "人类协作入口",
+  loginHeroSubtitle: "把 Agent 的审批、判断和短任务交给可信的人处理。每次请求都有范围、身份和审计记录。",
+  loginPanelTitle: "登录工作台",
+  loginPanelSubtitle: "优先使用 GitHub 或已绑定的 Passkey。",
+  loginConsolePrompt: "Agent 正在等待人类判断",
+  loginConsoleAnswer: "回复已写入审计记录，Agent 可继续执行",
   loginFlowAgent: "Agent 请求",
   loginFlowAgentHelp: "需要判断、审批或简短文本",
   loginFlowMcp: "ask_humen",
@@ -499,9 +510,36 @@ const zhText: Record<string, string> = {
   profileMissing: "暂无简介",
   onlineStatus: "在线",
   offlineStatus: "离线",
+  openGithubProfile: "GitHub",
   settingsSubtitle: "主题、语言和个人显示偏好",
   adminSubtitle: "主题、语言和个人显示偏好",
   securitySubtitle: "Passkey、注册、OAuth 和用户访问控制",
+  securityOverview: "安全总览",
+  securityOverviewHelp: "当前账号、登录入口和 Agent 访问边界的实时状态。",
+  securityLoginPolicy: "登录与注册",
+  securityLoginPolicyHelp: "普通用户优先通过 OAuth 登录；管理员账号密码仅用于初始化和维护。",
+  securityAgentBoundary: "Agent 访问边界",
+  securityAgentBoundaryHelp: "MCP 请求必须携带 Agent Secret；最终 secret 由管理员前缀和个人 secret 组合而成。",
+  securityCurrentSession: "当前会话",
+  securityPasskeyStatus: "Passkey",
+  securityOAuthStatus: "OAuth",
+  securityRegistrationStatus: "新用户注册",
+  securityAgentStatus: "Agent Secret",
+  enabledStatus: "已启用",
+  disabledStatus: "未启用",
+  availableStatus: "可用",
+  unavailableStatus: "不可用",
+  openStatus: "开放",
+  closedStatus: "关闭",
+  providerLabel: "登录方式",
+  oauthEnabledCount: "已启用渠道",
+  oauthDisabled: "未配置可用 OAuth 渠道",
+  passkeyReady: "当前浏览器和站点支持 Passkey",
+  passkeyNotReady: "当前浏览器或站点不支持 Passkey",
+  agentSecretRequired: "MCP 强制校验 secret",
+  agentDirectoryScope: "Agent 人才库范围",
+  adminPasswordPrivate: "账号密码登录仅保留给管理员",
+  oauthIdentityStable: "OAuth 身份绑定公开资料、信誉和 Agent Secret",
   leaderboardSubtitle: "按已处理 Agent 请求数和用户发送 token 量排名",
   requestsHandled: "处理请求",
   sentTokens: "用户发送 Token",
@@ -656,9 +694,12 @@ const enText: Record<string, string> = {
   loginWithOAuth: "Sign in with OAuth",
   oauthUnavailable: "OAuth sign-in is not configured yet. Ask an administrator to enable your account.",
   passkeyAccess: "Already have a passkey?",
-  loginHeroTitle: "Agent requests enter MCP. Humans return auditable replies.",
-  loginHeroSubtitle: "humen-mcp routes blocking questions from Codex, Claude Code, and other agents to online humans, then resumes the agent with a recorded answer.",
-  loginHeroJoinCue: "Hey human, join the talent pool",
+  loginHeroTitle: "Human review for agent work.",
+  loginHeroSubtitle: "Route approvals, judgments, and short tasks from agents to trusted humans. Every request keeps scope, identity, and audit context attached.",
+  loginPanelTitle: "Enter workspace",
+  loginPanelSubtitle: "Use GitHub or a bound passkey first.",
+  loginConsolePrompt: "Agent is waiting for human judgment",
+  loginConsoleAnswer: "Reply recorded. Agent can continue.",
   loginFlowAgent: "Agent request",
   loginFlowAgentHelp: "Judgment, approval, or short text",
   loginFlowMcp: "ask_humen",
@@ -720,9 +761,36 @@ const enText: Record<string, string> = {
   profileMissing: "No profile",
   onlineStatus: "online",
   offlineStatus: "offline",
+  openGithubProfile: "GitHub",
   settingsSubtitle: "Theme, language, and personal display preferences",
   adminSubtitle: "Theme, language, and personal display preferences",
   securitySubtitle: "Passkeys, registration, OAuth, and user access controls",
+  securityOverview: "Security overview",
+  securityOverviewHelp: "Live status for this account, sign-in entry points, and agent access boundaries.",
+  securityLoginPolicy: "Login and registration",
+  securityLoginPolicyHelp: "Regular users should use OAuth. Email/password sign-in is reserved for administrator setup and maintenance.",
+  securityAgentBoundary: "Agent access boundary",
+  securityAgentBoundaryHelp: "MCP requests must include an Agent Secret. The final secret combines the administrator prefix and personal secret.",
+  securityCurrentSession: "Current session",
+  securityPasskeyStatus: "Passkey",
+  securityOAuthStatus: "OAuth",
+  securityRegistrationStatus: "New user registration",
+  securityAgentStatus: "Agent Secret",
+  enabledStatus: "Enabled",
+  disabledStatus: "Disabled",
+  availableStatus: "Available",
+  unavailableStatus: "Unavailable",
+  openStatus: "Open",
+  closedStatus: "Closed",
+  providerLabel: "Sign-in method",
+  oauthEnabledCount: "Enabled channels",
+  oauthDisabled: "No enabled OAuth channel",
+  passkeyReady: "This browser and origin support passkeys",
+  passkeyNotReady: "This browser or origin does not support passkeys",
+  agentSecretRequired: "MCP enforces secret checks",
+  agentDirectoryScope: "Agent talent pool scope",
+  adminPasswordPrivate: "Email/password sign-in is administrator-only",
+  oauthIdentityStable: "OAuth identity owns profile, reputation, and Agent Secret",
   leaderboardSubtitle: "Ranked by handled agent requests and user-sent token volume",
   requestsHandled: "Handled requests",
   sentTokens: "User-sent tokens",
@@ -1251,12 +1319,13 @@ function App({ preferences, setPreferences }: AppProps) {
           ) : (
             <SecurityView
               token={token}
+              user={user}
               notice="Admin APIs are not available on this backend version yet."
             />
           )
         )}
         {view === "security" && !isAdmin && (
-          <SecurityView token={token} />
+          <SecurityView token={token} user={user} />
         )}
       </section>
     </main>
@@ -1362,13 +1431,22 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
           <span className="loginEyebrow">humen-mcp / ask_humen</span>
           <h2>{t("loginHeroTitle")}</h2>
           <p>{t("loginHeroSubtitle")}</p>
-          <pre className="loginJoinCue" aria-label={t("loginHeroJoinCue")}>{`        ${t("loginHeroJoinCue")}
-              |
-              |
-              v`}</pre>
+          <div className="loginHeroMetrics" aria-label="humen-mcp status">
+            <span><strong>/mcp</strong> endpoint</span>
+            <span><strong>passkey</strong> ready</span>
+            <span><strong>audit</strong> logged</span>
+          </div>
+          <LoginConsolePreview />
         </section>
 
         <section className="loginPanel">
+          <div className="loginPanelHead">
+            <span className="loginPanelIcon"><Shield size={18} /></span>
+            <div>
+              <h3>{t("loginPanelTitle")}</h3>
+              <p>{t("loginPanelSubtitle")}</p>
+            </div>
+          </div>
           <div className="loginPrimaryAuth">
             <span>{t("loginWithOAuth")}</span>
             {oauthEnabled ? <OAuthLoginButtons config={authConfig} /> : <p className="loginNotice">{t("oauthUnavailable")}</p>}
@@ -1409,11 +1487,49 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
             </form>
           )}
         </section>
-
-        <LoginFlowStage />
       </section>
+      <LoginFlowStage />
       <LoginPublicSections leaderboard={publicLeaderboard} />
     </main>
+  );
+}
+
+function LoginConsolePreview() {
+  const rows = [
+    { label: "agent", value: "codex.run", state: "online" },
+    { label: "route", value: "/mcp ask_humen", state: "90s" },
+    { label: "scope", value: "friends + agents", state: "policy" },
+    { label: "reply", value: "human.reviewed", state: "audit" }
+  ];
+
+  return (
+    <section className="loginConsolePreview" aria-label="request console preview">
+      <div className="consoleTopbar">
+        <span />
+        <span />
+        <span />
+        <code>{apiPath("/mcp")}</code>
+      </div>
+      <div className="consoleBody">
+        <div className="consolePrompt">
+          <Send size={16} />
+          <span>{t("loginConsolePrompt")}</span>
+        </div>
+        <div className="consoleRows">
+          {rows.map((row) => (
+            <div className="consoleRow" key={row.label}>
+              <span>{row.label}</span>
+              <strong>{row.value}</strong>
+              <em>{row.state}</em>
+            </div>
+          ))}
+        </div>
+        <div className="consoleAnswer">
+          <Check size={16} />
+          <span>{t("loginConsoleAnswer")}</span>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -2492,6 +2608,7 @@ function AgentView({
   const [access, setAccess] = useState<AgentAccess | null>(null);
   const [userSecretDraft, setUserSecretDraft] = useState("");
   const [prefixDraft, setPrefixDraft] = useState("");
+  const [selfProfile, setSelfProfile] = useState<UserProfile | null>(null);
   const [status, setStatus] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
 
@@ -2508,8 +2625,13 @@ function AgentView({
   }, [access?.user_agent_secret]);
 
   async function refresh() {
-    const data = await fetch(apiPath("/api/agent/access"), { headers: authHeaders(token) }).then((response) => safeJson<AgentAccess>(response));
+    const headers = authHeaders(token);
+    const [data, profile] = await Promise.all([
+      fetch(apiPath("/api/agent/access"), { headers }).then((response) => safeJson<AgentAccess>(response)),
+      fetch(apiPath("/api/me/profile"), { headers }).then((response) => safeJson<UserProfile>(response))
+    ]);
     if (data) setAccess(data);
+    if (profile) setSelfProfile(profile);
   }
 
   async function saveUserSecret() {
@@ -2551,8 +2673,19 @@ function AgentView({
   const mcpUrl = normalizeMcpUrl(access?.mcp_url ?? defaultMcpUrl());
   const accessKey = access?.agent_secret ?? "";
   const bearerLine = " -H " + shellQuote("Authorization: Bearer " + accessKey);
-  const codexSecretEnv = "HUMEN_MCP_SECRET";
-  const installPrompt = agentInstallPrompt(mcpUrl, accessKey);
+  const serverName = mcpServerName(access, selfProfile);
+  const ownerName = agentOwnerName(access, selfProfile);
+  const codexSecretEnv = mcpSecretEnvName(serverName);
+  const installPrompt = agentInstallPrompt(mcpUrl, accessKey, {
+    serverName,
+    ownerName,
+    profile: selfProfile?.profile ?? "",
+    tags: selfProfile?.tags ?? [],
+    visibility: access?.visibility ?? selfProfile?.visibility,
+    introCode: access?.friend_code ?? access?.intro_code ?? selfProfile?.friend_code ?? selfProfile?.intro_code ?? "",
+    directoryVisibility: access?.agent_directory_visibility,
+    directoryMinReputation: access?.agent_directory_min_reputation
+  });
   return (
     <section className="page agentPage">
       <div className="pageTitle">
@@ -2579,6 +2712,10 @@ function AgentView({
           <label className="copyField">
             <span>URL</span>
             <input value={mcpUrl} readOnly onFocus={(event) => event.currentTarget.select()} />
+          </label>
+          <label className="copyField">
+            <span>MCP Server Name</span>
+            <input value={serverName} readOnly onFocus={(event) => event.currentTarget.select()} />
           </label>
           <label className="copyField">
             <span>Agent Secret</span>
@@ -2662,20 +2799,20 @@ function AgentView({
           <section>
             <h4>Codex CLI</h4>
             <pre>{`export ${codexSecretEnv}=${shellQuote(accessKey)}
-codex mcp add humen --url ${shellQuote(mcpUrl)} --bearer-token-env-var ${codexSecretEnv}`}</pre>
+codex mcp add ${serverName} --url ${shellQuote(mcpUrl)} --bearer-token-env-var ${codexSecretEnv}`}</pre>
           </section>
           <section>
             <h4>通用 MCP JSON（仅用于客户端导入或设置页）</h4>
-            <pre>{`{
-  "mcpServers": {
-    "humen": {
-      "url": "${mcpUrl}",
-      "headers": {
-        "Authorization": "Bearer ${accessKey}"
-      }
-    }
-  }
-}`}</pre>
+            <pre>{JSON.stringify({
+              mcpServers: {
+                [serverName]: {
+                  url: mcpUrl,
+                  headers: {
+                    Authorization: `Bearer ${accessKey}`
+                  }
+                }
+              }
+            }, null, 2)}</pre>
           </section>
           <section>
             <h4>curl 测试</h4>
@@ -2689,7 +2826,7 @@ codex mcp add humen --url ${shellQuote(mcpUrl)} --bearer-token-env-var ${codexSe
             <ol>
               <li>优先使用 Codex CLI、Claude CLI 或对应客户端自带的 MCP 添加命令 / 设置页。</li>
               <li>默认使用标准 Bearer 认证；Codex CLI 请使用 <code>--bearer-token-env-var</code>。</li>
-              <li>新增一个名为 <code>humen</code> 的 remote/http MCP server。</li>
+              <li>新增一个名为 <code>{serverName}</code> 的 remote/http MCP server。</li>
               <li>URL 填上面的 MCP Endpoint。</li>
               <li>只有客户端无法配置 <code>Authorization: Bearer</code> 时，才使用兼容 header <code>x-humen-agent-secret</code>。</li>
               <li>如果当前是 CLI 工具，请用命令行添加；不要直接编辑配置文件。</li>
@@ -3641,11 +3778,35 @@ function AccountView({
 
 function SecurityView({
   token,
+  user,
   notice
 }: {
   token: string;
+  user: User;
   notice?: string;
 }) {
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
+  const [access, setAccess] = useState<AgentAccess | null>(null);
+  const supported = passkeysSupported();
+
+  useEffect(() => {
+    fetch(apiPath("/api/auth/config"))
+      .then((response) => safeJson<AuthConfig>(response))
+      .then((config) => setAuthConfig(config ?? { github_enabled: false, allow_registration: false, oauth_channels: [] }))
+      .catch(() => setAuthConfig({ github_enabled: false, allow_registration: false, oauth_channels: [] }));
+    fetch(apiPath("/api/agent/access"), { headers: authHeaders(token) })
+      .then((response) => safeJson<AgentAccess>(response))
+      .then((data) => {
+        if (data) setAccess(data);
+      })
+      .catch(() => {});
+  }, [token]);
+
+  const oauthChannels = authConfig?.oauth_channels ?? [];
+  const enabledOauthChannels = oauthChannels.filter((channel) => channel.enabled);
+  const oauthEnabled = Boolean(authConfig?.github_enabled || enabledOauthChannels.length > 0);
+  const registrationOpen = authConfig?.allow_registration !== false;
+
   return (
     <section className="page">
       <div className="pageTitle">
@@ -3656,7 +3817,121 @@ function SecurityView({
         <FrontendVersion />
       </div>
       {notice && <div className="notice">{notice}</div>}
+
+      <section className="securitySummary">
+        <SecurityStatusCard
+          icon={<Shield size={18} />}
+          title={t("securityCurrentSession")}
+          status={access?.secret_required === false ? t("disabledStatus") : t("enabledStatus")}
+          tone={access?.secret_required === false ? "warning" : "ok"}
+          detail={`${user.email} · ${t("providerLabel")}: ${user.provider}`}
+        />
+        <SecurityStatusCard
+          icon={<KeyRound size={18} />}
+          title={t("securityPasskeyStatus")}
+          status={supported && authConfig?.passkey_enabled !== false ? t("availableStatus") : t("unavailableStatus")}
+          tone={supported && authConfig?.passkey_enabled !== false ? "ok" : "warning"}
+          detail={supported ? t("passkeyReady") : t("passkeyNotReady")}
+        />
+        <SecurityStatusCard
+          icon={<Github size={18} />}
+          title={t("securityOAuthStatus")}
+          status={oauthEnabled ? t("enabledStatus") : t("disabledStatus")}
+          tone={oauthEnabled ? "ok" : "warning"}
+          detail={oauthEnabled ? `${t("oauthEnabledCount")}: ${enabledOauthChannels.map((channel) => channel.provider).join(", ") || "github"}` : t("oauthDisabled")}
+        />
+        <SecurityStatusCard
+          icon={<UserPlus size={18} />}
+          title={t("securityRegistrationStatus")}
+          status={registrationOpen ? t("openStatus") : t("closedStatus")}
+          tone={registrationOpen ? "ok" : "neutral"}
+          detail={t("adminPasswordPrivate")}
+        />
+      </section>
+
+      <section className="securityPolicyGrid">
+        <SecurityPolicyCard
+          icon={<UserCircle size={18} />}
+          title={t("securityLoginPolicy")}
+          help={t("securityLoginPolicyHelp")}
+          items={[
+            `${t("providerLabel")}: ${user.provider}`,
+            t("adminPasswordPrivate"),
+            t("oauthIdentityStable")
+          ]}
+        />
+        <SecurityPolicyCard
+          icon={<MessageSquareText size={18} />}
+          title={t("securityAgentBoundary")}
+          help={t("securityAgentBoundaryHelp")}
+          items={[
+            t("agentSecretRequired"),
+            `${t("agentDirectoryScope")}: ${agentDirectoryVisibilityLabel(access?.agent_directory_visibility ?? "self_only")}`,
+            access?.agent_directory_min_reputation ? `${t("agentDirectoryMinReputation")}: ${access.agent_directory_min_reputation}` : t("agentDirectorySelfOnlyHelp")
+          ]}
+        />
+      </section>
+
       <PasskeyPanel token={token} />
+    </section>
+  );
+}
+
+function SecurityStatusCard({
+  icon,
+  title,
+  status,
+  detail,
+  tone
+}: {
+  icon: React.ReactNode;
+  title: string;
+  status: string;
+  detail: string;
+  tone: "ok" | "warning" | "neutral";
+}) {
+  return (
+    <article className={`securityStatusCard ${tone}`}>
+      <div className="securityStatusIcon">{icon}</div>
+      <div>
+        <span>{title}</span>
+        <strong>{status}</strong>
+        <p>{detail}</p>
+      </div>
+    </article>
+  );
+}
+
+function SecurityPolicyCard({
+  icon,
+  title,
+  help,
+  items
+}: {
+  icon: React.ReactNode;
+  title: string;
+  help: string;
+  items: string[];
+}) {
+  return (
+    <section className="panel securityPolicyCard">
+      <div className="panelHead">
+        <div className="panelTitle">
+          {icon}
+          <div>
+            <h3>{title}</h3>
+            <p>{help}</p>
+          </div>
+        </div>
+      </div>
+      <ul>
+        {items.map((item) => (
+          <li key={item}>
+            <Check size={15} />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -4002,6 +4277,7 @@ function UserCard({
   const banned = profile.ban_expires_at && profile.ban_expires_at > Math.floor(Date.now() / 1000);
   const isSelf = currentUser ? profile.email.toLowerCase() === currentUser.toLowerCase() : false;
   const canReview = Boolean(token) && !isSelf;
+  const githubUrl = githubProfileUrl(profile);
 
   async function submitRating() {
     if (!token) return;
@@ -4051,21 +4327,28 @@ function UserCard({
   return (
     <article className="userCard">
       <div className="avatarCircle">{initials(displayIdentity(profile))}</div>
-      <div>
-        <strong>{displayIdentity(profile)}</strong>
+      <div className="userCardBody">
+        <div className="userCardTitle">
+          <strong>{displayIdentity(profile)}</strong>
+          {githubUrl && (
+            <a className="secondary small githubProfileLink" href={githubUrl} target="_blank" rel="noreferrer">
+              <Github size={15} /> {t("openGithubProfile")}
+            </a>
+          )}
+        </div>
         <p>{profile.profile || t("profileMissing")}</p>
-        <div className="metaRow">
+        <div className="userMetaGrid">
           <span className={profile.online ? "status onlineStatus" : "status"}>{profile.online ? t("onlineStatus") : t("offlineStatus")}</span>
-          <span>{profile.provider}</span>
-          <ReputationBadge
-            score={profile.reputation}
-            count={profile.ratings_count ?? 0}
-            breakdown={profile.reputation_breakdown}
-            compact
-          />
-          <span>{profileVisibilityLabel(profile.visibility ?? (profile.is_public ? "public" : "private"))}</span>
+          <span className="statusPill">{profile.provider}</span>
+          <span className="statusPill">{profileVisibilityLabel(profile.visibility ?? (profile.is_public ? "public" : "private"))}</span>
           {banned && <span className="dangerText">banned until {formatTime(profile.ban_expires_at!)}</span>}
         </div>
+        <ReputationBadge
+          score={profile.reputation}
+          count={profile.ratings_count ?? 0}
+          breakdown={profile.reputation_breakdown}
+          compact
+        />
         {(profile.friend_code ?? profile.intro_code) && (
           <div className="introCodeLine">
             <span>{t("introCode")}</span>
@@ -4156,7 +4439,9 @@ function ReputationBadge({
     <span className={`reputationBadge ${compact ? "compact" : ""}`} title={title}>
       <strong>{formatScore(score)}</strong>
       <span className="reputationDetails">
-        {hasEvidence ? t("reputation") : t("reputationDefault")} · {count} · {seedLabel}
+        {hasEvidence
+          ? `${t("reputation")} · ${t("ratingsCount")} ${count} · ${seedLabel}`
+          : t("reputationDefault")}
       </span>
       {!compact && (
         <span className="reputationDetails">
@@ -4251,7 +4536,8 @@ function passkeysSupported() {
   return typeof window !== "undefined" && "PublicKeyCredential" in window && Boolean(navigator.credentials);
 }
 
-function decodeCredentialCreationOptions(options: PublicKeyCredentialCreationOptionsJSON): CredentialCreationOptions {
+function decodeCredentialCreationOptions(payload: PublicKeyCredentialCreationOptionsPayload): CredentialCreationOptions {
+  const options = unwrapPublicKeyOptions(payload);
   return {
     publicKey: {
       ...options,
@@ -4265,7 +4551,8 @@ function decodeCredentialCreationOptions(options: PublicKeyCredentialCreationOpt
   };
 }
 
-function decodeCredentialRequestOptions(options: PublicKeyCredentialRequestOptionsJSON): CredentialRequestOptions {
+function decodeCredentialRequestOptions(payload: PublicKeyCredentialRequestOptionsPayload): CredentialRequestOptions {
+  const options = unwrapPublicKeyOptions(payload);
   return {
     publicKey: {
       ...options,
@@ -4280,6 +4567,13 @@ function decodeCredentialDescriptor(descriptor: PublicKeyCredentialDescriptorJSO
     ...descriptor,
     id: base64UrlToBuffer(descriptor.id)
   };
+}
+
+function unwrapPublicKeyOptions<T>(payload: T | { publicKey: T }): T {
+  if (typeof payload === "object" && payload !== null && "publicKey" in payload) {
+    return (payload as { publicKey: T }).publicKey;
+  }
+  return payload as T;
 }
 
 function publicKeyCredentialToJson(credential: PublicKeyCredential) {
@@ -4314,6 +4608,9 @@ function publicKeyCredentialToJson(credential: PublicKeyCredential) {
 }
 
 function base64UrlToBuffer(value: string): ArrayBuffer {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error("Invalid passkey challenge from server");
+  }
   const padding = "=".repeat((4 - (value.length % 4)) % 4);
   const base64 = `${value}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(base64);
@@ -4490,6 +4787,13 @@ function displayIdentity(profile: Pick<UserProfile, "email" | "login"> | Pick<Us
   return profile.email;
 }
 
+function githubProfileUrl(profile: Pick<UserProfile, "provider" | "login">) {
+  if (profile.provider !== "github" || !profile.login) return null;
+  const login = profile.login.trim();
+  if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(login)) return null;
+  return `https://github.com/${login}`;
+}
+
 function randomId() {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
   return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
@@ -4516,14 +4820,84 @@ function shellQuote(value: string) {
   return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
-function agentInstallPrompt(mcpUrl: string, accessKey: string) {
-  const headerJson = `,
-      "headers": {
-        "Authorization": "Bearer ${accessKey}"
-      }`;
-  const codexSecretEnv = "HUMEN_MCP_SECRET";
+type AgentInstallPromptContext = {
+  serverName: string;
+  ownerName: string;
+  profile: string;
+  tags: string[];
+  visibility?: ProfileVisibility;
+  introCode?: string;
+  directoryVisibility?: AgentDirectoryVisibility;
+  directoryMinReputation?: number;
+};
+
+function agentOwnerName(access: AgentAccess | null, profile: UserProfile | null) {
+  if (profile) return displayIdentity(profile);
+  return identityNameBase(access?.user ?? "humen");
+}
+
+function mcpServerName(access: AgentAccess | null, profile: UserProfile | null) {
+  const baseName = profile?.login?.trim() || identityNameBase(profile?.email ?? access?.user ?? "humen");
+  const slug = baseName
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return `${slug || "humen"}-human-mcp`;
+}
+
+function identityNameBase(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "humen";
+  const withoutProvider = trimmed.replace(/^github:/i, "");
+  const atIndex = withoutProvider.indexOf("@");
+  return atIndex > 0 ? withoutProvider.slice(0, atIndex) : withoutProvider;
+}
+
+function mcpSecretEnvName(serverName: string) {
+  const prefix = serverName
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase();
+  return `${prefix || "HUMEN_MCP"}_SECRET`;
+}
+
+function agentDirectoryScopeText(context: AgentInstallPromptContext) {
+  const minReputation = context.directoryMinReputation ?? 0;
+  switch (context.directoryVisibility) {
+    case "self_only":
+      return "当前策略只允许看到 secret 绑定用户。";
+    case "self_and_friends":
+      return "当前策略允许看到 secret 绑定用户和该用户的好友。";
+    case "reputation_at_least":
+      return `当前策略允许看到 secret 绑定用户，以及信誉不低于 ${minReputation} 的公开/Agent 可见用户。`;
+    case "public_users":
+      return "当前策略允许看到 secret 绑定用户，以及公开/Agent 可见用户。";
+    default:
+      return "可见范围由服务器策略控制，通常包含 secret 绑定用户、该用户好友，以及公开/Agent 可见用户。";
+  }
+}
+
+function agentInstallPrompt(mcpUrl: string, accessKey: string, context: AgentInstallPromptContext) {
+  const codexSecretEnv = mcpSecretEnvName(context.serverName);
   const secretLine = "认证信息：Agent Secret = " + accessKey;
-  return `请帮我把 humen-mcp 配置成一个 remote/http MCP server。
+  const profile = context.profile.trim() || "用户暂无简介。";
+  const tags = context.tags.length > 0 ? context.tags.join(" ") : "暂无标签";
+  const visibility = context.visibility ? profileVisibilityLabel(context.visibility) : "未知";
+  const introCode = context.introCode?.trim() || "未设置";
+  const importJson = JSON.stringify({
+    mcpServers: {
+      [context.serverName]: {
+        url: mcpUrl,
+        headers: {
+          Authorization: `Bearer ${accessKey}`
+        }
+      }
+    }
+  }, null, 2);
+
+  return `请帮我把 ${context.serverName} 配置成一个 remote/http MCP server。
 
 请先判断你当前使用的是哪种 Agent 工具或客户端，并使用它自带的 MCP 添加方式：
 
@@ -4533,28 +4907,36 @@ function agentInstallPrompt(mcpUrl: string, accessKey: string) {
 
 如果当前是 CLI 工具，必须通过命令行添加 MCP server；不要直接编辑配置文件（例如 settings.json、config.toml、claude_desktop_config.json 等）来添加。
 
-名称：humen
+名称：${context.serverName}
 MCP URL：${mcpUrl}
 ${secretLine}
+
+这个 Agent Secret 绑定到用户：${context.ownerName}
+用户简介：
+${profile}
+标签：${tags}
+可见性：${visibility}
+好友/介绍码：${introCode}
+
+使用边界：
+- 这是一个用户一个 secret 的 MCP 接入，不是全局匿名入口。
+- 默认的 ask_humen / approve / judge / feedback / create_humen_task 会把请求发给 secret 绑定用户：${context.ownerName}。
+- 也可以通过这个 MCP server 调用用户目录能力：list_online_humens、search_humen_profiles、list_humen_tags，用来发现和读取当前 secret 按策略可见的用户，包括绑定用户、用户朋友或公开/Agent 可见用户。
+- ${agentDirectoryScopeText(context)}
+- 如果要找朋友或公开用户，先用 search_humen_profiles 按姓名、简介或 #tag 搜索，再根据返回的 profile、reputation、online 状态决定是否继续。
 
 请优先使用标准 Bearer 认证。Codex CLI 使用 bearer token 环境变量：
 
 export ${codexSecretEnv}=${shellQuote(accessKey)}
-codex mcp add humen --url ${shellQuote(mcpUrl)} --bearer-token-env-var ${codexSecretEnv}
+codex mcp add ${context.serverName} --url ${shellQuote(mcpUrl)} --bearer-token-env-var ${codexSecretEnv}
 
-如果已存在同名 humen 配置，请先用 Codex CLI 命令移除旧配置：
+如果已存在同名 ${context.serverName} 配置，请先用 Codex CLI 命令移除旧配置：
 
-codex mcp remove humen
+codex mcp remove ${context.serverName}
 
 如果客户端只能通过 mcpServers JSON 导入或设置页添加，请使用下面内容；不要因为这个示例去手动编辑配置文件：
 
-{
-  "mcpServers": {
-    "humen": {
-      "url": "${mcpUrl}"${headerJson}
-    }
-  }
-}
+${importJson}
 
 只有客户端无法配置 Authorization: Bearer 时，才使用兼容 header：x-humen-agent-secret = ${accessKey}
 
@@ -4595,6 +4977,11 @@ function oauthCallbackUrl(provider: string) {
 
 function profileVisibilityLabel(visibility: ProfileVisibility) {
   const option = profileVisibilityOptions.find((item) => item.value === visibility) ?? profileVisibilityOptions[0];
+  return t(option.labelKey);
+}
+
+function agentDirectoryVisibilityLabel(visibility: AgentDirectoryVisibility) {
+  const option = agentDirectoryVisibilityOptions.find((item) => item.value === visibility) ?? agentDirectoryVisibilityOptions[0];
   return t(option.labelKey);
 }
 
