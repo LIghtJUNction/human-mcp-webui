@@ -2226,7 +2226,6 @@ function TaskPanel({ request, token, now, afterSubmit }: { request: HumanRequest
       <textarea className="note" value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("note")} />
 
       <footer>
-        <span>{request.timeout_seconds}s {t("timeout")}</span>
         <button className="primary" onClick={submit} disabled={submitting || !answer.trim() || now >= request.expires_at}>
           <Send size={18} /> {t("sendAnswer")}
         </button>
@@ -5266,7 +5265,7 @@ ${importJson}
 
 只有客户端无法配置 Authorization: Bearer 时，才使用兼容 header：x-humen-agent-secret = ${accessKey}
 
-配置后请重启/刷新 MCP 连接，并执行 tools/list 验证能看到 approve、judge、feedback、ask_humen、ask_humen_async、ask_humen_text_async、ask_humen_choice_async、ask_humen_judgment_async、read_humen_replies、create_humen_task、list_humen_tasks、list_online_humens、search_humen_profiles、list_humen_tags、rate_humen、report_humen。`;
+配置后请重启/刷新 MCP 连接，并执行 tools/list 验证能看到 approve、judge、feedback、ask_humen、ask_humen_async、ask_humen_text_async、ask_humen_choice_async、ask_humen_judgment_async、read_humen_replies、create_humen_task、list_humen_tasks、list_agent_inbox、request_human_friend、accept_human_friend、list_online_humens、search_humen_profiles、list_humen_tags、rate_humen、report_humen。`;
 }
 
 async function copyToClipboard(text: string, setStatus: (status: string) => void) {
