@@ -80,6 +80,7 @@ type HumanMemo = {
   author_email: string;
   body: string;
   created_at: number;
+  read_at?: number | null;
 };
 
 type AgentRelationStatus = "none" | "human_requested" | "agent_requested" | "friends";
@@ -94,6 +95,7 @@ type AgentHumanMessage = {
   status: "pending" | "resolved" | string;
   created_at: number;
   resolved_at?: number | null;
+  read_at?: number | null;
 };
 
 type ConnectedAgent = {
@@ -107,6 +109,9 @@ type ConnectedAgent = {
   last_seen_at: number;
   last_request_at?: number | null;
   request_count: number;
+  reputation: number;
+  ratings_count: number;
+  reputation_breakdown?: ReputationBreakdown | null;
   online: boolean;
   relation_status: AgentRelationStatus;
   pending_messages: AgentHumanMessage[];
@@ -163,6 +168,7 @@ type UserProfile = {
   onboarding_completed: boolean;
   online: boolean;
   last_login_at: number;
+  last_seen_at?: number | null;
   ban_expires_at?: number | null;
 };
 
@@ -549,6 +555,9 @@ const zhText: Record<string, string> = {
   agentCurrentTask: "当前任务",
   agentIdle: "暂无任务概况",
   agentLastTool: "最近工具",
+  lastSeen: "最后上线",
+  unread: "未读",
+  read: "已读",
   requestAgentFriend: "加 Agent 好友",
   acceptAgentFriend: "接受 Agent",
   requestAgentAskMe: "请求询问我",
@@ -615,6 +624,7 @@ const zhText: Record<string, string> = {
   reputationDefault: "默认信誉",
   reputationWeightedHelp: "GitHub 初始信誉 + 按评分者信誉加权的反馈",
   rateHuman: "评分",
+  rateAgent: "评价 Agent",
   reportHuman: "举报",
   reportReason: "举报原因",
   submitReport: "提交举报",
@@ -821,6 +831,9 @@ const enText: Record<string, string> = {
   agentCurrentTask: "Current task",
   agentIdle: "No task summary",
   agentLastTool: "Last tool",
+  lastSeen: "Last seen",
+  unread: "Unread",
+  read: "Read",
   requestAgentFriend: "Add agent friend",
   acceptAgentFriend: "Accept agent",
   requestAgentAskMe: "Ask me",
@@ -887,6 +900,7 @@ const enText: Record<string, string> = {
   reputationDefault: "Default reputation",
   reputationWeightedHelp: "GitHub seed plus feedback weighted by rater reputation",
   rateHuman: "Rate",
+  rateAgent: "Rate agent",
   reportHuman: "Report",
   reportReason: "Report reason",
   submitReport: "Submit report",
@@ -2718,6 +2732,8 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [score, setScore] = useState(5);
   const hasIncomingFriendRequest = agent.relation_status === "agent_requested";
   const isFriend = agent.relation_status === "friends";
 
@@ -2768,6 +2784,14 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
     }
   }
 
+  async function submitRating() {
+    const response = await post(`/api/agents/${encodeURIComponent(agent.id)}/rate`, { score });
+    if (response) {
+      setRatingOpen(false);
+      setStatus(t("ratingSubmitted"));
+    }
+  }
+
   return (
     <article className="userCard agentPanelCard">
       <div className="avatarCircle"><Bot size={22} /></div>
@@ -2780,8 +2804,14 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
         <div className="userMetaGrid">
           <span className="statusPill">{t("agentOwner")}: {agent.owner_email}</span>
           <span className="statusPill">{t("agentLastTool")}: {agent.last_tool || "-"}</span>
-          <span className="statusPill">{formatTime(agent.last_seen_at)}</span>
+          <span className="statusPill">{t("lastSeen")}: {formatTime(agent.last_seen_at)}</span>
         </div>
+        <ReputationBadge
+          score={agent.reputation}
+          count={agent.ratings_count ?? 0}
+          breakdown={agent.reputation_breakdown}
+          compact
+        />
         <div className="reviewBox">
           <strong>{t("agentCurrentTask")}</strong>
           <p>{agent.current_task || t("agentIdle")}</p>
@@ -2791,7 +2821,13 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
             {agent.pending_messages.map((message) => (
               <article className="memoItem" key={message.id}>
                 <p>{message.body}</p>
-                <small>{message.kind === "friend_request" ? t("incomingAgentRequest") : message.kind} · {formatTime(message.created_at)}</small>
+                <small>
+                  {message.kind === "friend_request" ? t("incomingAgentRequest") : message.kind}
+                  {" · "}
+                  {formatTime(message.created_at)}
+                  {" · "}
+                  {readStateText(message.read_at)}
+                </small>
               </article>
             ))}
           </div>
@@ -2809,10 +2845,24 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
             </button>
           )}
           {agent.relation_status === "human_requested" && <span className="statusPill">{t("agentPending")}</span>}
+          <button className="secondary small" onClick={() => setRatingOpen(!ratingOpen)} disabled={busy}>
+            <Check size={15} /> {t("rateAgent")}
+          </button>
           <button className="primary small" onClick={askMe} disabled={busy}>
             <MessageSquareText size={15} /> {t("requestAgentAskMe")}
           </button>
         </div>
+        {ratingOpen && (
+          <div className="reviewBox">
+            <label>
+              <span>{t("rateAgent")} {score}/10</span>
+              <input type="range" min="0" max="10" step="1" value={score} onChange={(event) => setScore(Number(event.target.value))} />
+            </label>
+            <button className="primary small" onClick={submitRating} disabled={busy}>
+              <Check size={15} /> {t("submitRating")}
+            </button>
+          </div>
+        )}
         {status && <div className={status.endsWith(".") || status.endsWith("。") ? "inlineStatus" : "notice warning"}>{status}</div>}
       </div>
     </article>
@@ -4633,6 +4683,7 @@ function UserCard({
           <span className={profile.online ? "status onlineStatus" : "status"}>{profile.online ? t("onlineStatus") : t("offlineStatus")}</span>
           <span className="statusPill">{profile.provider}</span>
           <span className="statusPill">{profileVisibilityLabel(profile.visibility ?? (profile.is_public ? "public" : "private"))}</span>
+          <span className="statusPill">{t("lastSeen")}: {formatProfileLastSeen(profile)}</span>
           {banned && <span className="dangerText">banned until {formatTime(profile.ban_expires_at!)}</span>}
         </div>
         <ReputationBadge
@@ -4708,7 +4759,13 @@ function UserCard({
               {memos.map((memo) => (
                 <article className="memoItem" key={memo.id}>
                   <p>{memo.body}</p>
-                  <small>{displayMemoAuthor(memo.author_email)} · {formatTime(memo.created_at)}</small>
+                  <small>
+                    {displayMemoAuthor(memo.author_email)}
+                    {" · "}
+                    {formatTime(memo.created_at)}
+                    {" · "}
+                    {readStateText(memo.read_at)}
+                  </small>
                 </article>
               ))}
               {memos.length === 0 && <small>{t("noMemos")}</small>}
@@ -4728,6 +4785,15 @@ function UserCard({
 function displayMemoAuthor(email: string) {
   if (email.startsWith("github:")) return email.replace(/^github:/, "GitHub ");
   return email;
+}
+
+function readStateText(readAt?: number | null) {
+  return readAt ? `${t("read")} ${formatTime(readAt)}` : t("unread");
+}
+
+function formatProfileLastSeen(profile: UserProfile) {
+  const lastSeen = profile.last_seen_at ?? profile.last_login_at;
+  return lastSeen ? formatTime(lastSeen) : "-";
 }
 
 function ReputationBadge({
