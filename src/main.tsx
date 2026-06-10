@@ -228,6 +228,7 @@ type WebhookConfig = {
   name: string;
   url: string;
   enabled: boolean;
+  assigned_to?: string | null;
   secret?: string | null;
   kind: "generic" | "wechat" | string;
   help_prompt?: string;
@@ -1185,6 +1186,9 @@ function App({ preferences, setPreferences }: AppProps) {
         <nav className="navList">
           <NavButton icon={<Inbox size={18} />} label={t("inbox")} count={requests.length} active={view === "inbox"} onClick={() => setView("inbox")} />
           <NavButton icon={<ListChecks size={18} />} label={t("tasks")} count={tasks.filter((task) => task.status !== "done" && task.status !== "archived").length} active={view === "tasks"} onClick={() => setView("tasks")} />
+          {isAdmin && adminSettings && (
+            <NavButton icon={<Webhook size={18} />} label="微信 / Webhooks" active={view === "webhooks"} onClick={() => setView("webhooks")} />
+          )}
           <NavButton icon={<Send size={18} />} label={t("sent")} count={sent.length} active={view === "sent"} onClick={() => setView("sent")} />
           <NavButton icon={<Trash2 size={18} />} label={t("trash")} count={trash.length} active={view === "trash"} onClick={() => setView("trash")} />
           <NavButton icon={<Users size={18} />} label={t("directory")} count={onlineUsers.length} active={view === "directory"} onClick={() => setView("directory")} />
@@ -1296,6 +1300,7 @@ function App({ preferences, setPreferences }: AppProps) {
           <WebhookView
             token={token}
             settings={adminSettings}
+            users={adminUsers}
             setSettings={setAdminSettings}
           />
         )}
@@ -2842,10 +2847,12 @@ codex mcp add ${serverName} --url ${shellQuote(mcpUrl)} --bearer-token-env-var $
 function WebhookView({
   token,
   settings,
+  users,
   setSettings
 }: {
   token: string;
   settings: AdminSettings;
+  users: UserProfile[];
   setSettings: (settings: AdminSettings | null) => void;
 }) {
   const [drafts, setDrafts] = useState<WebhookConfig[]>(() => settings.webhooks ?? []);
@@ -2877,6 +2884,7 @@ function WebhookView({
         name: "",
         url: "",
         enabled: false,
+        assigned_to: "",
         secret: "",
         kind,
         help_prompt: defaultWebhookHelpPrompt
@@ -3002,7 +3010,7 @@ function WebhookView({
             <Webhook size={18} />
             <div>
               <h3>触发规则</h3>
-              <p>Generic：ask_humen 创建消息时 POST 到目标 URL；微信：扫码登录后接收消息并可选转发到目标 URL。</p>
+              <p>Generic：ask_humen 创建消息时 POST 到目标 URL；微信：只同步绑定收件箱用户的请求，并把该微信收到的消息放回同一收件箱。</p>
             </div>
           </div>
         </div>
@@ -3034,6 +3042,17 @@ function WebhookView({
                 <label>
                   <span>目标 URL（可选）</span>
                   <input value={webhook.url} onChange={(event) => patchWebhook(index, { url: event.target.value })} placeholder="https://example.com/webhook" />
+                </label>
+                <label>
+                  <span>绑定收件箱用户</span>
+                  <select value={webhook.assigned_to ?? ""} onChange={(event) => patchWebhook(index, { assigned_to: event.target.value })}>
+                    <option value="">未指定（Generic 全局；微信默认管理员）</option>
+                    {users.map((profile) => (
+                      <option key={profile.email} value={profile.email}>
+                        {displayIdentity(profile)} · {profile.email}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className={webhook.kind === "wechat" ? "webhookSecretField hidden" : "webhookSecretField"}>
                   <span>Secret</span>
