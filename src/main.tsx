@@ -4,6 +4,7 @@ import { MantineProvider, createTheme } from "@mantine/core";
 import "@mantine/core/styles.css";
 import {
   Ban,
+  Bot,
   Check,
   Clock3,
   Github,
@@ -35,7 +36,7 @@ import logoUrl from "./assets/logo.svg";
 import "./styles.css";
 
 type TaskKind = "choice" | "judgment" | "text" | "image_review" | "steps";
-type View = "inbox" | "tasks" | "sent" | "trash" | "directory" | "leaderboard" | "tags" | "agent" | "webhooks" | "settings" | "security";
+type View = "inbox" | "tasks" | "sent" | "trash" | "directory" | "leaderboard" | "tags" | "agents" | "agent" | "webhooks" | "settings" | "security";
 
 type HumanRequest = {
   id: string;
@@ -79,6 +80,36 @@ type HumanMemo = {
   author_email: string;
   body: string;
   created_at: number;
+};
+
+type AgentRelationStatus = "none" | "human_requested" | "agent_requested" | "friends";
+
+type AgentHumanMessage = {
+  id: string;
+  agent_id: string;
+  human_email: string;
+  direction: "human_to_agent" | "agent_to_human" | string;
+  kind: "friend_request" | "ask_me" | string;
+  body: string;
+  status: "pending" | "resolved" | string;
+  created_at: number;
+  resolved_at?: number | null;
+};
+
+type ConnectedAgent = {
+  id: string;
+  owner_email: string;
+  name: string;
+  description: string;
+  current_task: string;
+  last_tool: string;
+  first_seen_at: number;
+  last_seen_at: number;
+  last_request_at?: number | null;
+  request_count: number;
+  online: boolean;
+  relation_status: AgentRelationStatus;
+  pending_messages: AgentHumanMessage[];
 };
 
 type AgentTaskStatus = "open" | "in_progress" | "done" | "archived";
@@ -229,7 +260,7 @@ type PasskeyAuthenticationStart = {
   options: PublicKeyCredentialRequestOptionsPayload;
 };
 
-const appViews = new Set<View>(["inbox", "tasks", "sent", "trash", "directory", "leaderboard", "tags", "agent", "webhooks", "settings", "security"]);
+const appViews = new Set<View>(["inbox", "tasks", "sent", "trash", "directory", "leaderboard", "tags", "agents", "agent", "webhooks", "settings", "security"]);
 
 type WebhookConfig = {
   id: string;
@@ -432,6 +463,7 @@ const zhText: Record<string, string> = {
   directory: "人才库",
   leaderboard: "排行榜",
   tags: "标签",
+  agents: "Agents",
   agent: "接入 Agent",
   adminSettings: "管理与设置",
   settings: "设置",
@@ -511,6 +543,21 @@ const zhText: Record<string, string> = {
   acceptFriend: "接受好友",
   removeFriend: "移除好友",
   friendPending: "已发送申请",
+  agentFriends: "Agent 好友",
+  noAgents: "暂无已连接 agents",
+  agentOwner: "绑定用户",
+  agentCurrentTask: "当前任务",
+  agentIdle: "暂无任务概况",
+  agentLastTool: "最近工具",
+  requestAgentFriend: "加 Agent 好友",
+  acceptAgentFriend: "接受 Agent",
+  requestAgentAskMe: "请求询问我",
+  agentFriendAccepted: "已成为 Agent 好友。",
+  agentFriendRequested: "已发送 Agent 好友申请。",
+  agentAskMePlaceholder: "告诉 agent 希望它问你什么",
+  agentAskMeSent: "已请求 agent 询问你。",
+  incomingAgentRequest: "Agent 发来的申请",
+  agentPending: "等待 Agent 处理",
   memoBoard: "留言板",
   memoPlaceholder: "给这个人类留言，或记录短期上下文",
   sendMemo: "发送留言",
@@ -688,6 +735,7 @@ const enText: Record<string, string> = {
   directory: "Talent Pool",
   leaderboard: "Leaderboard",
   tags: "Tags",
+  agents: "Agents",
   agent: "Connect Agent",
   adminSettings: "Admin & Settings",
   settings: "Settings",
@@ -767,6 +815,21 @@ const enText: Record<string, string> = {
   acceptFriend: "Accept friend",
   removeFriend: "Remove friend",
   friendPending: "Request sent",
+  agentFriends: "Agent friends",
+  noAgents: "No connected agents",
+  agentOwner: "Bound user",
+  agentCurrentTask: "Current task",
+  agentIdle: "No task summary",
+  agentLastTool: "Last tool",
+  requestAgentFriend: "Add agent friend",
+  acceptAgentFriend: "Accept agent",
+  requestAgentAskMe: "Ask me",
+  agentFriendAccepted: "Agent friend accepted.",
+  agentFriendRequested: "Agent friend request sent.",
+  agentAskMePlaceholder: "Tell the agent what you want it to ask you",
+  agentAskMeSent: "Agent ask request sent.",
+  incomingAgentRequest: "Incoming agent request",
+  agentPending: "Waiting for agent",
   memoBoard: "Memo board",
   memoPlaceholder: "Leave an offline message or short-term context",
   sendMemo: "Send memo",
@@ -1070,6 +1133,7 @@ function App({ preferences, setPreferences }: AppProps) {
   const [sent, setSent] = useState<AnsweredRequest[]>([]);
   const [trash, setTrash] = useState<ExpiredRequest[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<UserProfile[]>([]);
+  const [agents, setAgents] = useState<ConnectedAgent[]>([]);
   const [directory, setDirectory] = useState<UserProfile[]>([]);
   const [leaderboard, setLeaderboard] = useState<HumanLeaderboardEntry[]>([]);
   const [tagStats, setTagStats] = useState<TagStat[]>([]);
@@ -1176,6 +1240,7 @@ function App({ preferences, setPreferences }: AppProps) {
         refreshSent(token, setSent),
         refreshLeaderboard(token, setLeaderboard),
         refreshTrash(token, setTrash),
+        refreshAgents(token, setAgents),
         refreshUsers(token, setOnlineUsers, setDirectory, setTagStats),
         refreshAdmin(token, setIsAdmin, setAdminUsers, setAdminSettings, setAdminReports)
       ]);
@@ -1212,6 +1277,7 @@ function App({ preferences, setPreferences }: AppProps) {
           <NavButton icon={<Users size={18} />} label={t("directory")} count={onlineUsers.length} active={view === "directory"} onClick={() => setView("directory")} />
           <NavButton icon={<Trophy size={18} />} label={t("leaderboard")} count={leaderboard.length} active={view === "leaderboard"} onClick={() => setView("leaderboard")} />
           <NavButton icon={<Tags size={18} />} label={t("tags")} count={tagStats.length} active={view === "tags"} onClick={() => setView("tags")} />
+          <NavButton icon={<Bot size={18} />} label={t("agents")} count={agents.filter((agent) => agent.online).length} active={view === "agents"} onClick={() => setView("agents")} />
           <NavButton icon={<MessageSquareText size={18} />} label={t("agent")} active={view === "agent"} onClick={() => setView("agent")} />
           <NavButton icon={<Settings size={18} />} label={t("settings")} active={view === "settings"} onClick={() => setView("settings")} />
           <NavButton icon={<Shield size={18} />} label={t("security")} active={view === "security"} onClick={() => setView("security")} />
@@ -1306,6 +1372,7 @@ function App({ preferences, setPreferences }: AppProps) {
         }} />}
         {view === "leaderboard" && <LeaderboardView entries={leaderboard} token={token} setEntries={setLeaderboard} />}
         {view === "tags" && <TagsView tags={tagStats} setQuery={setQuery} setView={setView} />}
+        {view === "agents" && <AgentsView token={token} agents={agents} setAgents={setAgents} />}
         {view === "agent" && (
           <AgentView
             token={token}
@@ -2614,6 +2681,142 @@ function TagsView({ tags, setQuery, setView }: { tags: TagStat[]; setQuery: (que
         {tags.length === 0 && <Blank text={t("noTags")} />}
       </div>
     </section>
+  );
+}
+
+function AgentsView({
+  token,
+  agents,
+  setAgents
+}: {
+  token: string;
+  agents: ConnectedAgent[];
+  setAgents: (agents: ConnectedAgent[]) => void;
+}) {
+  async function reload() {
+    await refreshAgents(token, setAgents);
+  }
+
+  return (
+    <section className="page">
+      <div className="pageTitle">
+        <h2>{t("agents")}</h2>
+        <button className="secondary" onClick={reload}>
+          <RefreshCw size={16} /> {t("refresh")}
+        </button>
+      </div>
+      <div className="gridList">
+        {agents.map((agent) => (
+          <AgentCard key={agent.id} agent={agent} token={token} onChanged={reload} />
+        ))}
+        {agents.length === 0 && <Blank text={t("noAgents")} />}
+      </div>
+    </section>
+  );
+}
+
+function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: string; onChanged: () => void }) {
+  const [draft, setDraft] = useState("");
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const hasIncomingFriendRequest = agent.relation_status === "agent_requested";
+  const isFriend = agent.relation_status === "friends";
+
+  async function post(path: string, body?: unknown) {
+    setBusy(true);
+    setStatus("");
+    try {
+      const response = await fetch(apiPath(path), {
+        method: "POST",
+        headers: { ...authHeaders(token), "content-type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body)
+      });
+      if (!response.ok) {
+        setStatus((await safeError(response)) || t("saveFailed"));
+        return null;
+      }
+      await onChanged();
+      return response;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestFriend() {
+    const response = await post(`/api/agents/${encodeURIComponent(agent.id)}/friend-request`, {
+      body: draft.trim()
+    });
+    if (response) {
+      setDraft("");
+      setStatus(t("agentFriendRequested"));
+    }
+  }
+
+  async function acceptFriend() {
+    const response = await post(`/api/agents/${encodeURIComponent(agent.id)}/accept`);
+    if (response) setStatus(t("agentFriendAccepted"));
+  }
+
+  async function askMe() {
+    const prompt = draft.trim() || t("agentAskMePlaceholder");
+    const response = await post(`/api/agents/${encodeURIComponent(agent.id)}/ask-me`, {
+      title: t("requestAgentAskMe"),
+      prompt
+    });
+    if (response) {
+      setDraft("");
+      setStatus(t("agentAskMeSent"));
+    }
+  }
+
+  return (
+    <article className="userCard agentPanelCard">
+      <div className="avatarCircle"><Bot size={22} /></div>
+      <div className="userCardBody">
+        <div className="userCardTitle">
+          <strong>{agent.name || "MCP Agent"}</strong>
+          <span className={agent.online ? "status onlineStatus" : "status"}>{agent.online ? t("onlineStatus") : t("offlineStatus")}</span>
+        </div>
+        <p>{agent.description || t("profileMissing")}</p>
+        <div className="userMetaGrid">
+          <span className="statusPill">{t("agentOwner")}: {agent.owner_email}</span>
+          <span className="statusPill">{t("agentLastTool")}: {agent.last_tool || "-"}</span>
+          <span className="statusPill">{formatTime(agent.last_seen_at)}</span>
+        </div>
+        <div className="reviewBox">
+          <strong>{t("agentCurrentTask")}</strong>
+          <p>{agent.current_task || t("agentIdle")}</p>
+        </div>
+        {agent.pending_messages.length > 0 && (
+          <div className="memoList">
+            {agent.pending_messages.map((message) => (
+              <article className="memoItem" key={message.id}>
+                <p>{message.body}</p>
+                <small>{message.kind === "friend_request" ? t("incomingAgentRequest") : message.kind} · {formatTime(message.created_at)}</small>
+              </article>
+            ))}
+          </div>
+        )}
+        <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={t("agentAskMePlaceholder")} />
+        <div className="userCardActions">
+          {hasIncomingFriendRequest && (
+            <button className="secondary small" onClick={acceptFriend} disabled={busy}>
+              <Check size={15} /> {t("acceptAgentFriend")}
+            </button>
+          )}
+          {!isFriend && !hasIncomingFriendRequest && agent.relation_status !== "human_requested" && (
+            <button className="secondary small" onClick={requestFriend} disabled={busy}>
+              <UserPlus size={15} /> {t("requestAgentFriend")}
+            </button>
+          )}
+          {agent.relation_status === "human_requested" && <span className="statusPill">{t("agentPending")}</span>}
+          <button className="primary small" onClick={askMe} disabled={busy}>
+            <MessageSquareText size={15} /> {t("requestAgentAskMe")}
+          </button>
+        </div>
+        {status && <div className={status.endsWith(".") || status.endsWith("。") ? "inlineStatus" : "notice warning"}>{status}</div>}
+      </div>
+    </article>
   );
 }
 
@@ -4775,6 +4978,12 @@ async function refreshTrash(token: string, setTrash: (trash: ExpiredRequest[]) =
   const response = await fetch(apiPath("/api/trash"), { headers: authHeaders(token) });
   const data = await safeJson<ExpiredRequest[]>(response);
   setTrash(data ? sortTrash(data) : []);
+}
+
+async function refreshAgents(token: string, setAgents: (agents: ConnectedAgent[]) => void) {
+  const response = await fetch(apiPath("/api/agents"), { headers: authHeaders(token) });
+  const data = await safeJson<ConnectedAgent[]>(response);
+  setAgents(data ?? []);
 }
 
 async function refreshUsers(token: string, setOnline: (users: UserProfile[]) => void, setDirectory: (users: UserProfile[]) => void, setTags: (tags: TagStat[]) => void) {
