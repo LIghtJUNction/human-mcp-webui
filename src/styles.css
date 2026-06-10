@@ -35,7 +35,7 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--app-bg); color: var(--app-text); }
+body { margin: 0; min-width: 320px; min-height: 100vh; overflow-x: hidden; background: var(--app-bg); color: var(--app-text); }
 #root { min-height: 100vh; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
@@ -62,18 +62,18 @@ textarea.note, .compactNote { min-height: 84px; }
 .hidden { display: none !important; }
 
 .shell { display: grid; grid-template-columns: minmax(280px, 340px) 1fr; min-height: 100vh; }
-.sidebar { display: flex; flex-direction: column; gap: 14px; min-height: 100vh; padding: 18px; border-right: 1px solid var(--app-border); background: var(--app-surface); }
+.sidebar { display: flex; flex-direction: column; gap: 14px; height: 100vh; min-height: 0; overflow-y: auto; padding: 18px; border-right: 1px solid var(--app-border); background: var(--app-surface); }
 .workspace { display: grid; grid-template-rows: auto 1fr; min-width: 0; }
 .topbar { position: sticky; top: 0; z-index: 10; min-height: 64px; padding: 12px 24px; border-bottom: 1px solid var(--app-border); background: color-mix(in srgb, var(--app-surface) 92%, transparent); backdrop-filter: blur(12px); }
 
-:where(.brand, .topbar, .taskHeader, .task footer, .pageTitle, .panelHead, .cardHead, .metaRow, .userMenu, .rowActions, .tagRow, .panelTitle, .topbarLead, .loginHead, .loginPanelHead, .brandLockup, .leaderIdentity, .leaderMetrics, .relationStrip, .publicBoardHead, .publicBoard li, .exampleList div, .userCardTitle, .userCardActions, .userMetaGrid, .reviewBox, .toggleRow, .copyField, .profileToggle, .banUntil, .userRow, .userEdit, .weixinLoginHead > div) {
+:where(.brand, .topbar, .taskHeader, .task footer, .pageTitle, .panelHead, .cardHead, .metaRow, .userMenu, .rowActions, .tagRow, .panelTitle, .topbarLead, .loginHead, .loginPanelHead, .brandLockup, .leaderIdentity, .leaderMetrics, .relationStrip, .publicBoardHead, .publicBoard li, .exampleList div, .userCardTitle, .userCardActions, .userMetaGrid, .reviewBox, .toggleRow, .copyField, .profileToggle, .banUntil, .userRow, .userEdit, .weixinLoginHead > div, .directoryFilters) {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
 :where(.brand, .topbar, .task footer, .pageTitle, .panelHead, .loginHead) { justify-content: space-between; }
-:where(.pageTitle, .panelHead, .metaRow, .tagRow, .rowActions, .oauthActions, .oauthAddRow, .introAddRow, .passkeyAddRow, .agentSecretRow, .githubTokenGrid, .panelRefreshGroup, .weixinLoginHead, .weixinLoginBody, .leaderMetrics, .relationStrip) { flex-wrap: wrap; }
+:where(.pageTitle, .panelHead, .metaRow, .tagRow, .rowActions, .oauthActions, .oauthAddRow, .introAddRow, .passkeyAddRow, .agentSecretRow, .githubTokenGrid, .panelRefreshGroup, .weixinLoginHead, .weixinLoginBody, .leaderMetrics, .relationStrip, .directoryFilters) { flex-wrap: wrap; }
 .brand { padding-bottom: 14px; border-bottom: 1px solid var(--app-border); }
 :where(.brand > div, .brandLockup, .panelTitle, .topbarLead, .leaderIdentity) { min-width: 0; }
 :where(.brandLockup h1, .navButton span, .requestItem strong, .requestItem small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -83,6 +83,7 @@ textarea.note, .compactNote { min-height: 84px; }
   color: var(--app-muted);
 }
 
+.mode { flex: 0 0 auto; white-space: nowrap; }
 .brand p { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; font-weight: 700; }
 .brand p::before, .status::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--mantine-color-gray-5); }
 .brand p::before, .onlineStatus::before { background: var(--app-accent); }
@@ -119,12 +120,12 @@ textarea.note, .compactNote { min-height: 84px; }
   gap: 12px;
 }
 
-.requestList { flex: 1; align-content: start; overflow: auto; }
-.navButton { display: grid; grid-template-columns: 22px 1fr auto; justify-content: stretch; min-height: 42px; padding: 8px 10px; text-align: left; }
+.requestList { flex: 1 1 160px; min-height: 0; align-content: start; overflow: auto; }
+.navButton { display: grid; grid-template-columns: 22px 1fr auto; justify-content: stretch; min-height: 42px; min-width: 0; padding: 8px 10px; text-align: left; }
 :where(.navButton strong, .tagPill, .tagRow span, .statusPill) { background: var(--app-soft); color: var(--app-text); }
 .navButton strong { min-width: 24px; padding: 2px 7px; border-radius: 999px; text-align: center; font-size: 12px; }
 :where(.navButton.active, .requestItem.active, .addWebhookButton.active, .segmented button.active, .choices button.chosen) { border-color: var(--app-primary); background: var(--app-primary-soft); color: var(--app-primary); }
-.requestItem { display: grid; grid-template-columns: 24px 1fr; justify-content: stretch; min-height: 62px; padding: 10px; text-align: left; box-shadow: var(--app-shadow); }
+.requestItem { display: grid; grid-template-columns: 24px minmax(0, 1fr); justify-content: stretch; min-height: 62px; min-width: 0; padding: 10px; text-align: left; box-shadow: var(--app-shadow); }
 :where(.requestItem > svg, .taskHeader > svg, .introIcon, .previewHeader svg, .panelTitle svg, .cardHead svg) { color: var(--app-primary); }
 :where(.requestItem.expired, .notice.warning) { border-color: var(--mantine-color-red-6); background: var(--app-danger-soft); }
 .requestItem.sent { border-color: var(--mantine-color-gray-4); background: var(--app-info-soft); }
@@ -133,7 +134,7 @@ textarea.note, .compactNote { min-height: 84px; }
 .sidebarActions { padding-top: 10px; border-top: 1px solid var(--app-border); }
 .addWebhookButton { width: 100%; padding: 0 12px; }
 
-.page, .task { display: grid; align-content: start; gap: 18px; width: 100%; max-width: 1180px; padding: 26px; }
+.page, .task { display: grid; align-content: start; gap: 18px; width: 100%; max-width: 1180px; min-width: 0; padding: 26px; }
 .task { width: min(900px, calc(100% - 48px)); margin: 24px; }
 
 :where(.panel, .task, .listCard, .userCard, .metricPanel, .leaderboardRow, .oauthCard, .introCard, .introPanel, .publicBoard, .requestPreviewPanel, .loginPanel, .handoffStep, .passkeyItem, .securityStatusCard, .relationItem, .reportItem, .weixinLoginBox, .onboardingBox, .notice) {
@@ -170,11 +171,11 @@ textarea.note, .compactNote { min-height: 84px; }
 :where(.leaderboardRow, .userCard) { display: grid; gap: 12px; }
 .userCard { grid-template-columns: 44px minmax(0, 1fr); align-items: start; }
 .userCardBody { display: grid; gap: 10px; min-width: 0; }
-.userCardTitle { justify-content: space-between; align-items: flex-start; }
+.userCardTitle { justify-content: space-between; align-items: flex-start; min-width: 0; }
 .userCardTitle > strong { min-width: 0; overflow-wrap: anywhere; }
 .githubProfileLink { flex: 0 0 auto; }
 .userMetaGrid { justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
-.leaderboardRow { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+.leaderboardRow { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; min-width: 0; }
 .leaderIdentity p, .userCard p, .listCard p, .reportItem p { line-height: 1.5; }
 .leaderMetrics { justify-content: flex-end; }
 .leaderMetrics span { min-width: 112px; font-size: 12px; }
@@ -200,8 +201,8 @@ pre { overflow: auto; margin: 0; padding: 14px; border-radius: var(--mantine-rad
 .memoItem p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .memoItem small { color: var(--app-muted); }
 
-.segmented { display: inline-flex; width: fit-content; overflow: hidden; border: 1px solid var(--app-border); border-radius: var(--mantine-radius-md); background: var(--app-surface); }
-.segmented button { min-height: 36px; border: 0; border-radius: 0; padding: 0 12px; }
+.segmented { display: inline-flex; width: fit-content; max-width: 100%; overflow-x: auto; border: 1px solid var(--app-border); border-radius: var(--mantine-radius-md); background: var(--app-surface); }
+.segmented button { min-height: 36px; flex: 0 0 auto; border: 0; border-radius: 0; padding: 0 12px; white-space: nowrap; }
 .toggleRow { justify-content: space-between; }
 .toggleRow input, input[type="checkbox"] { width: auto; min-height: auto; accent-color: var(--app-primary); }
 :where(.settingsGrid, .oauthCardGrid) { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
@@ -222,10 +223,10 @@ pre { overflow: auto; margin: 0; padding: 14px; border-radius: var(--mantine-rad
 .securityStatusCard.ok { border-color: color-mix(in srgb, var(--app-accent) 42%, var(--app-border)); }
 .securityStatusCard.ok .securityStatusIcon { background: color-mix(in srgb, var(--app-accent) 16%, var(--app-soft)); color: var(--app-accent); }
 .securityStatusCard.warning { border-color: color-mix(in srgb, var(--mantine-color-yellow-6) 46%, var(--app-border)); background: color-mix(in srgb, var(--app-warning-soft) 24%, var(--app-surface)); }
-.securityPolicyCard { align-content: start; }
-.securityPolicyCard ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.securityPolicyCard li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; color: var(--app-text); font-size: 14px; line-height: 1.45; }
-.securityPolicyCard li svg { margin-top: 2px; color: var(--app-accent); }
+.directoryFilters > span { color: var(--app-muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.securityConfigPanel ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.securityConfigPanel li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; color: var(--app-text); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.securityConfigPanel li svg { margin-top: 2px; color: var(--app-accent); }
 :where(.agentSecretRow, .githubTokenGrid, .passkeyAddRow, .introAddRow) { display: flex; gap: 10px; }
 .agentSecretRow input, .githubTokenGrid label, .passkeyAddRow label, .introAddRow label { flex: 1; min-width: 220px; }
 .copyField input[readonly], .oauthCardGrid input[readonly] { color: var(--app-muted); }
@@ -347,8 +348,12 @@ pre { overflow: auto; margin: 0; padding: 14px; border-radius: var(--mantine-rad
   .loginFlowStage {
     grid-template-columns: 1fr;
   }
-  .sidebar { min-height: auto; border-right: 0; border-bottom: 1px solid var(--app-border); }
-  .requestList { max-height: 320px; }
+  .sidebar { position: sticky; top: 0; z-index: 30; height: auto; min-height: auto; max-height: 58vh; overflow: auto; padding: 12px 16px; border-right: 0; border-bottom: 1px solid var(--app-border); box-shadow: var(--app-shadow); }
+  .brand { padding-bottom: 10px; }
+  .navList { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scroll-snap-type: x proximity; }
+  .navButton { grid-template-columns: 20px minmax(72px, 1fr) auto; min-width: min(170px, 48vw); scroll-snap-align: start; }
+  .requestList { display: flex; flex: 0 0 auto; max-height: none; overflow-x: auto; padding-bottom: 2px; }
+  .requestList .requestItem, .requestList .empty { flex: 0 0 min(260px, 72vw); }
   .workspace { display: block; }
   :where(.loginNav, .loginHeroLayout, .loginPublicContent, .topbar, .page, .task) { width: min(100%, calc(100% - 32px)); padding-left: 0; padding-right: 0; }
   .task { width: auto; margin: 0; border-radius: 0; }
@@ -359,9 +364,31 @@ pre { overflow: auto; margin: 0; padding: 14px; border-radius: var(--mantine-rad
 }
 
 @media (max-width: 640px) {
-  :where(.loginNav, .topbar, .userMenu, .pageTitle, .panelHead, .rowActions, .agentSecretRow, .githubTokenGrid, .passkeyAddRow, .introAddRow, .weixinLoginBody, .userRow) { align-items: stretch; flex-direction: column; }
-  :where(.judgmentChoices, .choices, .settingsGrid, .oauthCardGrid, .webhookGrid) { grid-template-columns: 1fr; }
-  :where(.topbarAction, .avatarButton, .primary, .secondary, .oauth, .sourceLink) { width: 100%; }
+  .shell { display: block; }
+  .sidebar { max-height: 48vh; padding: 10px 12px; }
+  .brand { align-items: center; }
+  .brand p { display: none; }
+  .navButton { min-width: min(150px, 50vw); }
+  .requestList .requestItem, .requestList .empty { flex-basis: min(230px, 78vw); }
+  .topbar { align-items: flex-start; gap: 8px; min-height: 0; padding: 10px 0; }
+  .topbarLead, .userMenu { width: 100%; min-width: 0; overflow-x: auto; padding-bottom: 2px; }
+  .topbarLead, .userMenu { justify-content: flex-start; }
+  .userMenu { align-items: center; flex-wrap: nowrap; }
+  .avatarButton { min-width: min(220px, 72vw); }
+  .avatarButton small { min-width: 0; }
+  .avatarButton small:not(strong), .avatarButton small { overflow: hidden; }
+  .avatarButton small { text-overflow: ellipsis; white-space: nowrap; }
+  :where(.loginNav, .pageTitle, .panelHead, .rowActions, .agentSecretRow, .githubTokenGrid, .passkeyAddRow, .introAddRow, .weixinLoginBody, .userRow, .directoryFilters) { align-items: stretch; flex-direction: column; }
+  :where(.judgmentChoices, .choices, .settingsGrid, .oauthCardGrid, .webhookGrid, .gridList, .securityConfigPanel ul) { grid-template-columns: 1fr; }
+  .userCard { grid-template-columns: 1fr; }
+  .leaderboardRow { grid-template-columns: 1fr; }
+  .leaderIdentity, .leaderMetrics, .userCardTitle, .userCardActions, .reviewBox, .copyField, .profileToggle, .banUntil { align-items: stretch; flex-direction: column; }
+  .leaderMetrics span, .reputationBadge { width: 100%; min-width: 0; max-width: none; }
+  .segmented, .directoryFilters .segmented, .taskFilters { width: 100%; }
+  .panel, .listCard, .userCard, .metricPanel, .leaderboardRow, .oauthCard, .introCard, .introPanel, .publicBoard, .passkeyItem, .securityStatusCard, .relationItem, .reportItem, .weixinLoginBox, .onboardingBox { padding: 14px; }
+  .securityStatusCard { min-height: auto; }
+  :where(.topbarAction, .avatarButton, .topbar .sourceLink, .topbar .iconButton) { width: auto; flex: 0 0 auto; }
+  :where(.pageTitle .primary, .pageTitle .secondary, .rowActions .primary, .rowActions .secondary, .agentSecretRow .primary, .agentSecretRow .secondary, .githubTokenGrid .primary, .githubTokenGrid .secondary, .passkeyAddRow .primary, .passkeyAddRow .secondary, .introAddRow .primary, .introAddRow .secondary, .oauthActions .primary, .oauthActions .secondary, .webhookActions .primary, .webhookActions .secondary, .loginPanel .primary, .loginPanel .secondary, .loginPanel .oauth, .loginNav .sourceLink) { width: 100%; }
   .weixinQr { width: 100%; max-width: 220px; }
   .loginShell { overflow: visible; }
   .loginNav { align-items: flex-start; }

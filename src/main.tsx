@@ -296,6 +296,7 @@ type WebhookConfig = {
 
 type AgentDirectoryVisibility = "public_users" | "reputation_at_least" | "self_and_friends" | "self_only";
 type ProfileVisibility = "private" | "friends" | "agents" | "public";
+type DirectoryFilter = "all" | "online" | "friends" | "agents" | "public";
 
 type AdminSettings = {
   allow_registration: boolean;
@@ -378,16 +379,24 @@ const theme = createTheme({
 const profileTemplateEn = `Hi, I can help with human-in-the-loop checks.
 
 Skills: #review #ops #qa
-Available for: approvals, UI checks, account actions, short research
-Language/timezone:
-Escalation notes:`;
+Can help with: approvals, UI checks, deployment checks, account actions, short research
+Usually available:
+Languages/timezone:
+Response style: concise / detailed / screenshots OK
+Cannot approve:
+Escalation notes:
+Trusted contexts:`;
 
 const profileTemplateZh = `你好，我可以协助处理需要人类判断的 Agent 请求。
 
 擅长：#review #ops #qa
-可处理：审批、界面检查、账号操作、简短调研
+可处理：审批、界面检查、部署核验、账号操作、简短调研
+通常在线：
 语言/时区：
-升级说明：`;
+回复偏好：简短 / 详细 / 可截图
+不能审批：
+升级说明：
+可信上下文：`;
 
 function profileTemplate() {
   return currentLanguage() === "en" ? profileTemplateEn : profileTemplateZh;
@@ -578,6 +587,12 @@ const zhText: Record<string, string> = {
   incomingRequests: "收到的申请",
   outgoingRequests: "已发送申请",
   noHumans: "没有找到人才",
+  directoryFilter: "筛选",
+  directoryFilterAll: "全部",
+  directoryFilterOnline: "在线",
+  directoryFilterFriends: "好友",
+  directoryFilterAgentVisible: "Agent 可见",
+  directoryFilterPublic: "公开",
   noTags: "暂无标签",
   profileMissing: "暂无简介",
   onlineStatus: "在线",
@@ -597,6 +612,7 @@ const zhText: Record<string, string> = {
   securityOAuthStatus: "OAuth",
   securityRegistrationStatus: "新用户注册",
   securityAgentStatus: "Agent Secret",
+  securityRuntimeConfig: "当前配置",
   enabledStatus: "已启用",
   disabledStatus: "未启用",
   availableStatus: "可用",
@@ -854,6 +870,12 @@ const enText: Record<string, string> = {
   incomingRequests: "Incoming requests",
   outgoingRequests: "Outgoing requests",
   noHumans: "No talent found",
+  directoryFilter: "Filter",
+  directoryFilterAll: "All",
+  directoryFilterOnline: "Online",
+  directoryFilterFriends: "Friends",
+  directoryFilterAgentVisible: "Agent visible",
+  directoryFilterPublic: "Public",
   noTags: "No tags yet",
   profileMissing: "No profile",
   onlineStatus: "online",
@@ -873,6 +895,7 @@ const enText: Record<string, string> = {
   securityOAuthStatus: "OAuth",
   securityRegistrationStatus: "New user registration",
   securityAgentStatus: "Agent Secret",
+  securityRuntimeConfig: "Current configuration",
   enabledStatus: "Enabled",
   disabledStatus: "Disabled",
   availableStatus: "Available",
@@ -1125,7 +1148,8 @@ function UpdatePanelControl({ onRefresh, refreshing }: { onRefresh: () => void; 
 }
 
 function wsPath(token: string) {
-  const url = new URL(apiPath(`/api/ws?token=${encodeURIComponent(token)}`), window.location.href);
+  const path = token ? `/api/ws?token=${encodeURIComponent(token)}` : "/api/ws";
+  const url = new URL(apiPath(path), window.location.href);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url.toString();
 }
@@ -1178,7 +1202,6 @@ function App({ preferences, setPreferences }: AppProps) {
   }, []);
 
   useEffect(() => {
-    if (!token) return;
     fetch(apiPath("/api/me"), { headers: authHeaders(token) })
       .then((response) => {
         if (!response.ok) throw new Error("unauthorized");
@@ -1189,7 +1212,7 @@ function App({ preferences, setPreferences }: AppProps) {
   }, [token]);
 
   useEffect(() => {
-    if (!token || !user) return;
+    if (!user) return;
     refreshAll();
     const ws = new WebSocket(wsPath(token));
     ws.onmessage = (event) => {
@@ -1235,7 +1258,7 @@ function App({ preferences, setPreferences }: AppProps) {
   }, [token, user]);
 
   useEffect(() => {
-    if (!token || !user) return;
+    if (!user) return;
     const handle = window.setTimeout(() => {
       refreshDirectory(token, setDirectory, query);
     }, 180);
@@ -1243,7 +1266,6 @@ function App({ preferences, setPreferences }: AppProps) {
   }, [query, token, user]);
 
   async function refreshAll() {
-    if (!token) return;
     setBusy(true);
     try {
       if (isAdmin && await panelUpdateAvailable()) {
@@ -1265,7 +1287,7 @@ function App({ preferences, setPreferences }: AppProps) {
     }
   }
 
-  if (!token || !user) {
+  if (!user) {
     return <Login onToken={setToken} />;
   }
 
@@ -2554,6 +2576,21 @@ function DirectoryView({
   const [introCode, setIntroCode] = useState("");
   const [friends, setFriends] = useState<FriendBundle>({ friends: [], incoming: [], outgoing: [] });
   const [status, setStatus] = useState("");
+  const [filter, setFilter] = useState<DirectoryFilter>("all");
+  const filterOptions: Array<{ value: DirectoryFilter; label: string }> = [
+    { value: "all", label: t("directoryFilterAll") },
+    { value: "online", label: t("directoryFilterOnline") },
+    { value: "friends", label: t("directoryFilterFriends") },
+    { value: "agents", label: t("directoryFilterAgentVisible") },
+    { value: "public", label: t("directoryFilterPublic") }
+  ];
+  const visibleUsers = users.filter((profile) => {
+    if (filter === "online") return profile.online;
+    if (filter === "friends") return profile.is_friend;
+    if (filter === "agents") return profile.visibility === "agents" || profile.visibility === "public";
+    if (filter === "public") return profile.visibility === "public" || profile.is_public;
+    return true;
+  });
 
   useEffect(() => {
     refreshFriends();
@@ -2622,6 +2659,20 @@ function DirectoryView({
           </button>
         ))}
       </div>
+      <div className="directoryFilters">
+        <span>{t("directoryFilter")}</span>
+        <div className="segmented">
+          {filterOptions.map((option) => (
+            <button
+              key={option.value}
+              className={filter === option.value ? "active" : ""}
+              onClick={() => setFilter(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <form className="introAddRow" onSubmit={addByIntroCode}>
         <label>
           <span>{t("introCode")}</span>
@@ -2656,7 +2707,7 @@ function DirectoryView({
         </section>
       )}
       <div className="gridList">
-        {users.map((profile) => (
+        {visibleUsers.map((profile) => (
           <UserCard
             key={profile.email}
             profile={profile}
@@ -2668,7 +2719,7 @@ function DirectoryView({
             onChanged={onChanged}
           />
         ))}
-        {users.length === 0 && <Blank text={t("noHumans")} />}
+        {visibleUsers.length === 0 && <Blank text={t("noHumans")} />}
       </div>
     </section>
   );
@@ -4115,6 +4166,19 @@ function SecurityView({
   const enabledOauthChannels = oauthChannels.filter((channel) => channel.enabled);
   const oauthEnabled = Boolean(authConfig?.github_enabled || enabledOauthChannels.length > 0);
   const registrationOpen = authConfig?.allow_registration !== false;
+  const oauthProviders = enabledOauthChannels.map((channel) => oauthProviderLabel(channel.provider));
+  if (authConfig?.github_enabled && !oauthProviders.includes("GitHub")) oauthProviders.push("GitHub");
+  const runtimeConfigItems = [
+    `${t("providerLabel")}: ${user.provider}`,
+    `${t("securityPasskeyStatus")}: ${authConfig?.passkey_enabled === false ? t("disabledStatus") : t("enabledStatus")} / ${supported ? t("availableStatus") : t("unavailableStatus")}`,
+    `${t("securityOAuthStatus")}: ${oauthProviders.length > 0 ? oauthProviders.join(", ") : t("oauthDisabled")}`,
+    `${t("securityRegistrationStatus")}: ${registrationOpen ? t("openStatus") : t("closedStatus")}`,
+    `${t("securityAgentStatus")}: ${access?.secret_required === false ? t("disabledStatus") : t("enabledStatus")}`,
+    `${t("agentDirectoryScope")}: ${agentDirectoryVisibilityLabel(access?.agent_directory_visibility ?? "self_only")}`,
+    ...(access?.agent_directory_visibility === "reputation_at_least"
+      ? [`${t("agentDirectoryMinReputation")}: ${access.agent_directory_min_reputation ?? 0}`]
+      : [])
+  ];
 
   return (
     <section className="page">
@@ -4158,27 +4222,21 @@ function SecurityView({
         />
       </section>
 
-      <section className="securityPolicyGrid">
-        <SecurityPolicyCard
-          icon={<UserCircle size={18} />}
-          title={t("securityLoginPolicy")}
-          help={t("securityLoginPolicyHelp")}
-          items={[
-            `${t("providerLabel")}: ${user.provider}`,
-            t("adminPasswordPrivate"),
-            t("oauthIdentityStable")
-          ]}
-        />
-        <SecurityPolicyCard
-          icon={<MessageSquareText size={18} />}
-          title={t("securityAgentBoundary")}
-          help={t("securityAgentBoundaryHelp")}
-          items={[
-            t("agentSecretRequired"),
-            `${t("agentDirectoryScope")}: ${agentDirectoryVisibilityLabel(access?.agent_directory_visibility ?? "self_only")}`,
-            access?.agent_directory_min_reputation ? `${t("agentDirectoryMinReputation")}: ${access.agent_directory_min_reputation}` : t("agentDirectorySelfOnlyHelp")
-          ]}
-        />
+      <section className="panel securityConfigPanel">
+        <div className="panelHead">
+          <div className="panelTitle">
+            <Shield size={18} />
+            <h3>{t("securityRuntimeConfig")}</h3>
+          </div>
+        </div>
+        <ul>
+          {runtimeConfigItems.map((item) => (
+            <li key={item}>
+              <Check size={15} />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <PasskeyPanel token={token} />
@@ -4208,40 +4266,6 @@ function SecurityStatusCard({
         <p>{detail}</p>
       </div>
     </article>
-  );
-}
-
-function SecurityPolicyCard({
-  icon,
-  title,
-  help,
-  items
-}: {
-  icon: React.ReactNode;
-  title: string;
-  help: string;
-  items: string[];
-}) {
-  return (
-    <section className="panel securityPolicyCard">
-      <div className="panelHead">
-        <div className="panelTitle">
-          {icon}
-          <div>
-            <h3>{title}</h3>
-            <p>{help}</p>
-          </div>
-        </div>
-      </div>
-      <ul>
-        {items.map((item) => (
-          <li key={item}>
-            <Check size={15} />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
 
@@ -4578,8 +4602,7 @@ function UserCard({
   onRemove?: (email: string) => void;
   onChanged?: () => void;
 }) {
-  const [mode, setMode] = useState<"idle" | "rate" | "report" | "memo">("idle");
-  const [score, setScore] = useState(5);
+  const [mode, setMode] = useState<"idle" | "report" | "memo">("idle");
   const [reason, setReason] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -4636,28 +4659,6 @@ function UserCard({
       setMemoDraft("");
       setMemosLoaded(true);
       setStatus(t("memoSaved"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function submitRating() {
-    if (!token) return;
-    setBusy(true);
-    setStatus("");
-    try {
-      const response = await fetch(apiPath("/api/humans/rate"), {
-        method: "POST",
-        headers: { ...authHeaders(token), "content-type": "application/json" },
-        body: JSON.stringify({ rated_email: profile.email, score })
-      });
-      if (!response.ok) {
-        setStatus((await safeError(response)) || t("saveFailed"));
-        return;
-      }
-      setStatus(t("ratingSubmitted"));
-      setMode("idle");
-      onChanged?.();
     } finally {
       setBusy(false);
     }
@@ -4743,26 +4744,10 @@ function UserCard({
               </button>
             )}
             {canReview && (
-              <>
-                <button className="secondary small" onClick={() => setMode(mode === "rate" ? "idle" : "rate")}>
-                  <Check size={15} /> {t("rateHuman")}
-                </button>
-                <button className="secondary small" onClick={() => setMode(mode === "report" ? "idle" : "report")}>
-                  <Ban size={15} /> {t("reportHuman")}
-                </button>
-              </>
+              <button className="secondary small" onClick={() => setMode(mode === "report" ? "idle" : "report")}>
+                <Ban size={15} /> {t("reportHuman")}
+              </button>
             )}
-          </div>
-        )}
-        {canReview && mode === "rate" && (
-          <div className="reviewBox">
-            <label>
-              <span>{t("rateHuman")} {score}/10</span>
-              <input type="range" min="0" max="10" step="1" value={score} onChange={(event) => setScore(Number(event.target.value))} />
-            </label>
-            <button className="primary small" onClick={submitRating} disabled={busy}>
-              <Check size={15} /> {t("submitRating")}
-            </button>
           </div>
         )}
         {canReview && mode === "report" && (
@@ -4941,8 +4926,8 @@ function usePreferences(): [Preferences, (preferences: Preferences) => void] {
   return [preferences, setPreferences];
 }
 
-function authHeaders(token: string) {
-  return { authorization: `Bearer ${token}` };
+function authHeaders(token: string): Record<string, string> {
+  return token ? { authorization: `Bearer ${token}` } : {};
 }
 
 function passkeysSupported() {
@@ -5484,6 +5469,10 @@ function logout(
   setSent: (sent: AnsweredRequest[]) => void,
   setTrash: (trash: ExpiredRequest[]) => void
 ) {
+  void fetch(apiPath("/api/auth/logout"), {
+    method: "POST",
+    headers: authHeaders(localStorage.getItem(tokenKey) ?? "")
+  }).catch(() => {});
   localStorage.removeItem(tokenKey);
   setToken("");
   setUser(null);
