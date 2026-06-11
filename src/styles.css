@@ -76,7 +76,7 @@ textarea.note, .compactNote { min-height: 84px; }
 :where(.pageTitle, .panelHead, .metaRow, .tagRow, .rowActions, .oauthActions, .oauthAddRow, .introAddRow, .passkeyAddRow, .agentSecretRow, .githubTokenGrid, .panelRefreshGroup, .weixinLoginHead, .weixinLoginBody, .leaderMetrics, .relationStrip, .directoryFilters) { flex-wrap: wrap; }
 .brand { padding-bottom: 14px; border-bottom: 1px solid var(--app-border); }
 :where(.brand > div, .brandLockup, .panelTitle, .topbarLead, .leaderIdentity) { min-width: 0; }
-:where(.brandLockup h1, .navButton span, .requestItem strong, .requestItem small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:where(.brandLockup h1, .navLabel, .requestItem strong, .requestItem small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .appLogo { width: 34px; height: 34px; flex: 0 0 auto; border-radius: var(--mantine-radius-md); }
 
 :where(.brand p, .mode, .requestItem small, .empty, .blank, .listCard small, .userCard p, .metaRow, .frontendVersion, .pageTitle p, .panelHead p, .introHeader p, .introCard p, .introPanel p, .publicBoard em, .weixinLoginMeta small, .leaderMetrics span, .introCodeLine, .inlineStatus, .loginHeroCopy p, .loginNotice, .publicBoardEmpty) {
@@ -122,8 +122,11 @@ textarea.note, .compactNote { min-height: 84px; }
 
 .requestList { flex: 1 1 160px; min-height: 0; align-content: start; overflow: auto; }
 .navButton { display: grid; grid-template-columns: 22px 1fr auto; justify-content: stretch; min-height: 42px; min-width: 0; padding: 8px 10px; text-align: left; }
+.navLabel { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.unreadDot { display: inline-block; width: 9px; height: 9px; flex: 0 0 auto; border: 2px solid var(--app-surface); border-radius: 999px; background: var(--mantine-color-red-6); box-shadow: 0 0 0 1px color-mix(in srgb, var(--mantine-color-red-6) 42%, transparent); }
 :where(.navButton strong, .tagPill, .tagRow span, .statusPill) { background: var(--app-soft); color: var(--app-text); }
 .navButton strong { min-width: 24px; padding: 2px 7px; border-radius: 999px; text-align: center; font-size: 12px; }
+.navButton strong.unreadCount { border-color: var(--mantine-color-red-6); background: var(--mantine-color-red-6); color: white; }
 :where(.navButton.active, .requestItem.active, .addWebhookButton.active, .segmented button.active, .choices button.chosen) { border-color: var(--app-primary); background: var(--app-primary-soft); color: var(--app-primary); }
 .requestItem { display: grid; grid-template-columns: 24px minmax(0, 1fr); justify-content: stretch; min-height: 62px; min-width: 0; padding: 10px; text-align: left; box-shadow: var(--app-shadow); }
 :where(.requestItem > svg, .taskHeader > svg, .introIcon, .previewHeader svg, .panelTitle svg, .cardHead svg) { color: var(--app-primary); }
@@ -196,10 +199,17 @@ pre { overflow: auto; margin: 0; padding: 14px; border-radius: var(--mantine-rad
 :where(.reviewBox, .onboardingBox, .oauthCallbackHint, .agentPolicySummary, .guideWarning, .notice) { padding: 12px; background: var(--app-soft); }
 .notice { box-shadow: none; }
 .memoBoard { display: grid; gap: 10px; }
+.memoBoardHead { display: flex; align-items: center; gap: 8px; color: var(--mantine-color-red-6); font-size: 12px; }
 .memoList { display: grid; gap: 8px; max-height: 220px; overflow: auto; }
 .memoItem { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--app-border); border-radius: var(--mantine-radius-md); background: var(--app-surface); }
+.memoItem.unread { border-color: color-mix(in srgb, var(--mantine-color-red-6) 54%, var(--app-border)); background: color-mix(in srgb, var(--app-danger-soft) 36%, var(--app-surface)); }
 .memoItem p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .memoItem small { color: var(--app-muted); }
+.statusPill a, a.statusPill { color: inherit; text-decoration: none; }
+.statusPill a:hover, a.statusPill:hover { color: var(--app-primary); }
+.publicProfileShell { min-height: 100vh; }
+.publicProfilePage { width: min(900px, calc(100vw - 32px)); margin: 0 auto 48px; display: grid; gap: 18px; }
+.publicProfilePage .gridList { grid-template-columns: minmax(0, 1fr); }
 
 .segmented { display: inline-flex; width: fit-content; max-width: 100%; overflow-x: auto; border: 1px solid var(--app-border); border-radius: var(--mantine-radius-md); background: var(--app-surface); }
 .segmented button { min-height: 36px; flex: 0 0 auto; border: 0; border-radius: 0; padding: 0 12px; white-space: nowrap; }
@@ -352,8 +362,9 @@ pre { overflow: auto; margin: 0; padding: 14px; border-radius: var(--mantine-rad
   .brand { padding-bottom: 10px; }
   .navList { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scroll-snap-type: x proximity; }
   .navButton { grid-template-columns: 20px minmax(72px, 1fr) auto; min-width: min(170px, 48vw); scroll-snap-align: start; }
-  .requestList { display: flex; flex: 0 0 auto; max-height: none; overflow-x: auto; padding-bottom: 2px; }
-  .requestList .requestItem, .requestList .empty { flex: 0 0 min(260px, 72vw); }
+  .navList, .requestList { -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .requestList { display: flex; flex: 0 0 auto; max-height: 148px; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 2px; scroll-snap-type: x proximity; }
+  .requestList .requestItem, .requestList .empty { flex: 0 0 min(260px, 72vw); scroll-snap-align: start; }
   .workspace { display: block; }
   :where(.loginNav, .loginHeroLayout, .loginPublicContent, .topbar, .page, .task) { width: min(100%, calc(100% - 32px)); padding-left: 0; padding-right: 0; }
   .task { width: auto; margin: 0; border-radius: 0; }
@@ -365,11 +376,19 @@ pre { overflow: auto; margin: 0; padding: 14px; border-radius: var(--mantine-rad
 
 @media (max-width: 640px) {
   .shell { display: block; }
-  .sidebar { max-height: 48vh; padding: 10px 12px; }
-  .brand { align-items: center; }
+  .sidebar { gap: 10px; max-height: min(38vh, 300px); padding: 10px 12px; }
+  .brand { align-items: center; flex-wrap: nowrap; gap: 8px; }
+  .brandLockup h1 { font-size: 18px; }
+  .appLogo { width: 30px; height: 30px; }
   .brand p { display: none; }
-  .navButton { min-width: min(150px, 50vw); }
-  .requestList .requestItem, .requestList .empty { flex-basis: min(230px, 78vw); }
+  .navList { gap: 6px; }
+  .navButton { grid-template-columns: 20px minmax(58px, 1fr) auto; min-width: min(132px, 44vw); min-height: 40px; padding: 7px 8px; }
+  .navButton svg { flex: 0 0 auto; }
+  .navLabel { gap: 5px; font-size: 12px; }
+  .navButton strong { min-width: 20px; padding: 1px 6px; font-size: 11px; }
+  .requestList { max-height: 118px; gap: 8px; }
+  .requestList .requestItem, .requestList .empty { flex-basis: min(220px, 76vw); }
+  .requestItem { min-height: 56px; padding: 8px; }
   .topbar { align-items: flex-start; gap: 8px; min-height: 0; padding: 10px 0; }
   .topbarLead, .userMenu { width: 100%; min-width: 0; overflow-x: auto; padding-bottom: 2px; }
   .topbarLead, .userMenu { justify-content: flex-start; }
@@ -378,6 +397,7 @@ pre { overflow: auto; margin: 0; padding: 14px; border-radius: var(--mantine-rad
   .avatarButton small { min-width: 0; }
   .avatarButton small:not(strong), .avatarButton small { overflow: hidden; }
   .avatarButton small { text-overflow: ellipsis; white-space: nowrap; }
+  .page { gap: 14px; padding-top: 18px; padding-bottom: 18px; }
   :where(.loginNav, .pageTitle, .panelHead, .rowActions, .agentSecretRow, .githubTokenGrid, .passkeyAddRow, .introAddRow, .weixinLoginBody, .userRow, .directoryFilters) { align-items: stretch; flex-direction: column; }
   :where(.judgmentChoices, .choices, .settingsGrid, .oauthCardGrid, .webhookGrid, .gridList, .securityConfigPanel ul) { grid-template-columns: 1fr; }
   .userCard { grid-template-columns: 1fr; }

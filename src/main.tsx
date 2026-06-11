@@ -85,6 +85,19 @@ type HumanMemo = {
   read_at?: number | null;
 };
 
+type HumanMemoUnreadSource = {
+  author_email: string;
+  author_agent_id?: string | null;
+  author_agent_name?: string | null;
+  count: number;
+  latest_at: number;
+};
+
+type HumanMemoUnreadSummary = {
+  total: number;
+  sources: HumanMemoUnreadSource[];
+};
+
 type AgentRelationStatus = "none" | "human_requested" | "agent_requested" | "friends";
 
 type AgentHumanMessage = {
@@ -103,6 +116,7 @@ type AgentHumanMessage = {
 type ConnectedAgent = {
   id: string;
   owner_email: string;
+  owner_platform_name?: string | null;
   name: string;
   description: string;
   current_task: string;
@@ -153,6 +167,7 @@ type ReputationBreakdown = {
 
 type UserProfile = {
   email: string;
+  platform_name: string;
   login?: string | null;
   provider: "password" | "github" | "passkey";
   profile: string;
@@ -187,6 +202,7 @@ type TagStat = {
 
 type HumanLeaderboardEntry = {
   email: string;
+  platform_name: string;
   login?: string | null;
   requests_handled: number;
   sent_tokens: number;
@@ -571,11 +587,11 @@ const zhText: Record<string, string> = {
   read: "已读",
   requestAgentFriend: "加 Agent 好友",
   acceptAgentFriend: "接受 Agent",
-  requestAgentAskMe: "请求询问我",
+  requestAgentAskMe: "发送留言",
   agentFriendAccepted: "已成为 Agent 好友。",
   agentFriendRequested: "已发送 Agent 好友申请。",
-  agentAskMePlaceholder: "告诉 agent 希望它问你什么",
-  agentAskMeSent: "已请求 agent 询问你。",
+  agentAskMePlaceholder: "给这个 agent 绑定用户留言",
+  agentAskMeSent: "留言已发送。",
   incomingAgentRequest: "Agent 发来的申请",
   agentPending: "等待 Agent 处理",
   memoBoard: "留言板",
@@ -583,6 +599,9 @@ const zhText: Record<string, string> = {
   sendMemo: "发送留言",
   noMemos: "暂无留言",
   memoSaved: "留言已保存。",
+  profileHome: "个人主页",
+  openWorkspace: "打开工作台",
+  publicProfileNotFound: "这个用户主页不存在，或资料尚未公开。",
   friends: "好友",
   incomingRequests: "收到的申请",
   outgoingRequests: "已发送申请",
@@ -854,11 +873,11 @@ const enText: Record<string, string> = {
   read: "Read",
   requestAgentFriend: "Add agent friend",
   acceptAgentFriend: "Accept agent",
-  requestAgentAskMe: "Ask me",
+  requestAgentAskMe: "Send memo",
   agentFriendAccepted: "Agent friend accepted.",
   agentFriendRequested: "Agent friend request sent.",
-  agentAskMePlaceholder: "Tell the agent what you want it to ask you",
-  agentAskMeSent: "Agent ask request sent.",
+  agentAskMePlaceholder: "Leave a memo for this agent's bound user",
+  agentAskMeSent: "Memo sent.",
   incomingAgentRequest: "Incoming agent request",
   agentPending: "Waiting for agent",
   memoBoard: "Memo board",
@@ -866,6 +885,9 @@ const enText: Record<string, string> = {
   sendMemo: "Send memo",
   noMemos: "No memos yet",
   memoSaved: "Memo saved.",
+  profileHome: "Profile home",
+  openWorkspace: "Open workspace",
+  publicProfileNotFound: "This user home does not exist, or the profile is not public yet.",
   friends: "Friends",
   incomingRequests: "Incoming requests",
   outgoingRequests: "Outgoing requests",
@@ -1180,16 +1202,25 @@ function App({ preferences, setPreferences }: AppProps) {
   const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
   const [adminReports, setAdminReports] = useState<HumanReport[]>([]);
   const [adminSettings, setAdminSettings] = useState<AdminSettings | null>(null);
+  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
+  const [memoUnread, setMemoUnread] = useState<HumanMemoUnreadSummary>({ total: 0, sources: [] });
+  const [memoRefreshSeq, setMemoRefreshSeq] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const now = useNow();
+  const profileSlug = publicProfileSlug();
 
   const selected = useMemo(
     () => requests.find((request) => request.id === selectedId) ?? requests[0] ?? null,
     [requests, selectedId]
+  );
+  const activeTaskCount = useMemo(() => tasks.filter((task) => task.status !== "done" && task.status !== "archived").length, [tasks]);
+  const unreadAgentMessages = useMemo(
+    () => agents.filter((agent) => agent.pending_messages.some((message) => !message.read_at)).length,
+    [agents]
   );
 
   useEffect(() => {
@@ -1208,7 +1239,7 @@ function App({ preferences, setPreferences }: AppProps) {
         return response.json();
       })
       .then((data) => setUser(data.user))
-      .catch(() => logout(setToken, setUser, setRequests, setTasks, setSent, setTrash));
+      .catch(() => logout(setToken, setUser, setRequests, setTasks, setSent, setTrash, setWebhooks));
   }, [token]);
 
   useEffect(() => {
@@ -1245,6 +1276,10 @@ function App({ preferences, setPreferences }: AppProps) {
       if (message.type === "task_created" || message.type === "task_updated") {
         setTasks((current) => upsertAgentTask(current, message.task));
       }
+      if (message.type === "memo_created") {
+        setMemoRefreshSeq((current) => current + 1);
+        refreshMemoUnread(token, setMemoUnread);
+      }
       if (message.type === "trash_cleaned") {
         refreshTrash(token, setTrash);
       }
@@ -1279,12 +1314,18 @@ function App({ preferences, setPreferences }: AppProps) {
         refreshLeaderboard(token, setLeaderboard),
         refreshTrash(token, setTrash),
         refreshAgents(token, setAgents),
+        refreshMemoUnread(token, setMemoUnread),
+        refreshWebhooks(token, setWebhooks),
         refreshUsers(token, setOnlineUsers, setDirectory, setTagStats),
         refreshAdmin(token, setIsAdmin, setAdminUsers, setAdminSettings, setAdminReports)
       ]);
     } finally {
       setBusy(false);
     }
+  }
+
+  if (profileSlug) {
+    return <PublicProfilePage slug={profileSlug} token={token} currentUser={user?.email ?? ""} />;
   }
 
   if (!user) {
@@ -1305,17 +1346,15 @@ function App({ preferences, setPreferences }: AppProps) {
         </div>
 
         <nav className="navList">
-          <NavButton icon={<Inbox size={18} />} label={t("inbox")} count={requests.length} active={view === "inbox"} onClick={() => setView("inbox")} />
-          <NavButton icon={<ListChecks size={18} />} label={t("tasks")} count={tasks.filter((task) => task.status !== "done" && task.status !== "archived").length} active={view === "tasks"} onClick={() => setView("tasks")} />
-          {isAdmin && adminSettings && (
-            <NavButton icon={<Webhook size={18} />} label="微信 / Webhooks" active={view === "webhooks"} onClick={() => setView("webhooks")} />
-          )}
+          <NavButton icon={<Inbox size={18} />} label={t("inbox")} count={requests.length} active={view === "inbox"} unread={requests.length > 0} onClick={() => setView("inbox")} />
+          <NavButton icon={<ListChecks size={18} />} label={t("tasks")} count={activeTaskCount} active={view === "tasks"} unread={activeTaskCount > 0} onClick={() => setView("tasks")} />
+          <NavButton icon={<Webhook size={18} />} label="微信 / Webhooks" count={webhooks.length} active={view === "webhooks"} onClick={() => setView("webhooks")} />
           <NavButton icon={<Send size={18} />} label={t("sent")} count={sent.length} active={view === "sent"} onClick={() => setView("sent")} />
           <NavButton icon={<Trash2 size={18} />} label={t("trash")} count={trash.length} active={view === "trash"} onClick={() => setView("trash")} />
-          <NavButton icon={<Users size={18} />} label={t("directory")} count={onlineUsers.length} active={view === "directory"} onClick={() => setView("directory")} />
+          <NavButton icon={<Users size={18} />} label={t("directory")} count={onlineUsers.length} active={view === "directory"} unread={memoUnread.total > 0} onClick={() => setView("directory")} />
           <NavButton icon={<Trophy size={18} />} label={t("leaderboard")} count={leaderboard.length} active={view === "leaderboard"} onClick={() => setView("leaderboard")} />
           <NavButton icon={<Tags size={18} />} label={t("tags")} count={tagStats.length} active={view === "tags"} onClick={() => setView("tags")} />
-          <NavButton icon={<Bot size={18} />} label={t("agents")} count={agents.filter((agent) => agent.online).length} active={view === "agents"} onClick={() => setView("agents")} />
+          <NavButton icon={<Bot size={18} />} label={t("agents")} count={agents.filter((agent) => agent.online).length} active={view === "agents"} unread={unreadAgentMessages > 0} onClick={() => setView("agents")} />
           <NavButton icon={<MessageSquareText size={18} />} label={t("agent")} active={view === "agent"} onClick={() => setView("agent")} />
           <NavButton icon={<Settings size={18} />} label={t("settings")} active={view === "settings"} onClick={() => setView("settings")} />
           <NavButton icon={<Shield size={18} />} label={t("security")} active={view === "security"} onClick={() => setView("security")} />
@@ -1398,15 +1437,16 @@ function App({ preferences, setPreferences }: AppProps) {
           setPreferences={setPreferences}
           isAdmin={isAdmin}
           onSettings={() => setView("settings")}
-          onLogout={() => logout(setToken, setUser, setRequests, setTasks, setSent, setTrash)}
+          onLogout={() => logout(setToken, setUser, setRequests, setTasks, setSent, setTrash, setWebhooks)}
         />
         {view === "inbox" && (selected ? <TaskPanel request={selected} token={token} now={now} afterSubmit={() => setSelectedId(null)} /> : <Blank />)}
         {view === "tasks" && <AgentTasksView tasks={tasks} token={token} setTasks={setTasks} />}
         {view === "sent" && <SentView sent={sent} token={token} setSent={setSent} />}
         {view === "trash" && <TrashView trash={trash} token={token} setTrash={setTrash} />}
-        {view === "directory" && <DirectoryView query={query} setQuery={setQuery} users={directory} tags={tagStats} token={token} currentUser={user.email} onChanged={() => {
+        {view === "directory" && <DirectoryView query={query} setQuery={setQuery} users={directory} tags={tagStats} token={token} currentUser={user.email} memoUnread={memoUnread} memoRefreshSeq={memoRefreshSeq} onMemoUnreadChanged={() => refreshMemoUnread(token, setMemoUnread)} onChanged={() => {
           refreshUsers(token, setOnlineUsers, setDirectory, setTagStats);
           refreshLeaderboard(token, setLeaderboard);
+          refreshMemoUnread(token, setMemoUnread);
         }} />}
         {view === "leaderboard" && <LeaderboardView entries={leaderboard} token={token} setEntries={setLeaderboard} />}
         {view === "tags" && <TagsView tags={tagStats} setQuery={setQuery} setView={setView} />}
@@ -1419,15 +1459,18 @@ function App({ preferences, setPreferences }: AppProps) {
             setSettings={setAdminSettings}
           />
         )}
-        {view === "webhooks" && isAdmin && adminSettings && (
+        {view === "webhooks" && (
           <WebhookView
             token={token}
-            settings={adminSettings}
-            users={adminUsers}
+            settings={isAdmin ? adminSettings : null}
+            webhooks={webhooks}
+            users={isAdmin ? adminUsers : []}
+            currentUser={user.email}
+            isAdmin={isAdmin}
             setSettings={setAdminSettings}
+            setWebhooks={setWebhooks}
           />
         )}
-        {view === "webhooks" && (!isAdmin || !adminSettings) && <Blank text="Only administrators can manage webhooks" />}
         {view === "settings" && (
           <AccountView token={token} user={user} preferences={preferences} setPreferences={setPreferences} />
         )}
@@ -1455,6 +1498,61 @@ function App({ preferences, setPreferences }: AppProps) {
         {view === "security" && !isAdmin && (
           <SecurityView token={token} user={user} />
         )}
+      </section>
+    </main>
+  );
+}
+
+function PublicProfilePage({ slug, token, currentUser }: { slug: string; token: string; currentUser: string }) {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [missing, setMissing] = useState(false);
+
+  useEffect(() => {
+    setProfile(null);
+    setMissing(false);
+    fetch(apiPath(`/api/public/users/${encodeURIComponent(slug)}`))
+      .then((response) => {
+        if (!response.ok) throw new Error("missing");
+        return safeJson<UserProfile>(response);
+      })
+      .then((profile) => {
+        if (profile) setProfile(profile);
+        else setMissing(true);
+      })
+      .catch(() => setMissing(true));
+  }, [slug]);
+
+  return (
+    <main className="loginShell publicProfileShell">
+      <header className="loginNav">
+        <BrandLockup />
+        <a className="sourceLink" href="/mcp/">{t("openWorkspace")}</a>
+      </header>
+      <section className="publicProfilePage">
+        <div className="pageTitle">
+          <div>
+            <h2>{profile ? displayIdentity(profile) : `@${slug}`}</h2>
+            <p>{t("publicProfile")}</p>
+          </div>
+          {profile && profileHomePath(profile) && (
+            <a className="secondary small" href={profileHomePath(profile)!}>
+              <UserCircle size={15} /> {profileHomePath(profile)}
+            </a>
+          )}
+        </div>
+        {profile && (
+          <div className="gridList">
+            <UserCard
+              profile={profile}
+              token={token}
+              currentUser={currentUser}
+              memoUnreadCount={0}
+              memoRefreshSeq={0}
+            />
+          </div>
+        )}
+        {!profile && !missing && <Blank text={t("waiting")} />}
+        {missing && <Blank text={t("publicProfileNotFound")} />}
       </section>
     </main>
   );
@@ -2096,12 +2194,29 @@ function OAuthLoginButtons({ config }: { config: AuthConfig }) {
   );
 }
 
-function NavButton({ icon, label, count, active, onClick }: { icon: React.ReactNode; label: string; count?: number; active: boolean; onClick: () => void }) {
+function NavButton({
+  icon,
+  label,
+  count,
+  active,
+  unread = false,
+  onClick
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count?: number;
+  active: boolean;
+  unread?: boolean;
+  onClick: () => void;
+}) {
   return (
     <button className={`navButton ${active ? "active" : ""}`} onClick={onClick}>
       {icon}
-      <span>{label}</span>
-      {count !== undefined && <strong>{count}</strong>}
+      <span className="navLabel">
+        {label}
+        {unread && <span className="unreadDot" title={t("unread")} />}
+      </span>
+      {count !== undefined && <strong className={unread ? "unreadCount" : ""}>{count}</strong>}
     </button>
   );
 }
@@ -2563,6 +2678,9 @@ function DirectoryView({
   tags,
   token,
   currentUser,
+  memoUnread,
+  memoRefreshSeq,
+  onMemoUnreadChanged,
   onChanged
 }: {
   query: string;
@@ -2571,6 +2689,9 @@ function DirectoryView({
   tags: TagStat[];
   token: string;
   currentUser: string;
+  memoUnread: HumanMemoUnreadSummary;
+  memoRefreshSeq: number;
+  onMemoUnreadChanged: () => void;
   onChanged: () => void;
 }) {
   const [introCode, setIntroCode] = useState("");
@@ -2713,9 +2834,12 @@ function DirectoryView({
             profile={profile}
             token={token}
             currentUser={currentUser}
+            memoUnreadCount={profile.email.toLowerCase() === currentUser.toLowerCase() ? memoUnread.total : 0}
+            memoRefreshSeq={memoRefreshSeq}
             onAdd={(email) => createFriendRequest({ email })}
             onAccept={acceptFriend}
             onRemove={removeFriend}
+            onMemoUnreadChanged={onMemoUnreadChanged}
             onChanged={onChanged}
           />
         ))}
@@ -2807,6 +2931,9 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
   const [score, setScore] = useState(5);
   const hasIncomingFriendRequest = agent.relation_status === "agent_requested";
   const isFriend = agent.relation_status === "friends";
+  const unreadMessages = agent.pending_messages.filter((message) => !message.read_at);
+  const ownerName = agent.owner_platform_name?.trim() || agent.owner_email;
+  const ownerHome = /^[a-z0-9][a-z0-9-]{1,31}$/.test(ownerName) ? `/${encodeURIComponent(ownerName)}` : null;
 
   async function post(path: string, body?: unknown) {
     setBusy(true);
@@ -2843,11 +2970,11 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
     if (response) setStatus(t("agentFriendAccepted"));
   }
 
-  async function askMe() {
-    const prompt = draft.trim() || t("agentAskMePlaceholder");
+  async function sendAgentMemo() {
+    const body = draft.trim();
+    if (!body) return;
     const response = await post(`/api/agents/${encodeURIComponent(agent.id)}/ask-me`, {
-      title: t("requestAgentAskMe"),
-      prompt
+      body
     });
     if (response) {
       setDraft("");
@@ -2873,7 +3000,9 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
         </div>
         <p>{agent.description || t("profileMissing")}</p>
         <div className="userMetaGrid">
-          <span className="statusPill">{t("agentOwner")}: {agent.owner_email}</span>
+          <span className="statusPill">
+            {t("agentOwner")}: {ownerHome ? <a href={ownerHome}>{ownerName}</a> : ownerName}
+          </span>
           <span className="statusPill">{t("agentLastTool")}: {agent.last_tool || "-"}</span>
           <span className="statusPill">{t("lastSeen")}: {formatTime(agent.last_seen_at)}</span>
         </div>
@@ -2888,9 +3017,16 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
           <p>{agent.current_task || t("agentIdle")}</p>
         </div>
         {agent.pending_messages.length > 0 && (
-          <div className="memoList">
+          <div className="memoBoard">
+            {unreadMessages.length > 0 && (
+              <div className="memoBoardHead">
+                <span className="unreadDot" />
+                <strong>{t("unread")} {unreadMessages.length}</strong>
+              </div>
+            )}
+            <div className="memoList">
             {agent.pending_messages.map((message) => (
-              <article className="memoItem" key={message.id}>
+              <article className={`memoItem ${message.read_at ? "" : "unread"}`} key={message.id}>
                 <p>{message.body}</p>
                 <small>
                   {message.kind === "friend_request" ? t("incomingAgentRequest") : message.kind}
@@ -2901,6 +3037,7 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
                 </small>
               </article>
             ))}
+            </div>
           </div>
         )}
         <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={t("agentAskMePlaceholder")} />
@@ -2919,7 +3056,7 @@ function AgentCard({ agent, token, onChanged }: { agent: ConnectedAgent; token: 
           <button className="secondary small" onClick={() => setRatingOpen(!ratingOpen)} disabled={busy}>
             <Check size={15} /> {t("rateAgent")}
           </button>
-          <button className="primary small" onClick={askMe} disabled={busy}>
+          <button className="primary small" onClick={sendAgentMemo} disabled={busy || !draft.trim()}>
             <MessageSquareText size={15} /> {t("requestAgentAskMe")}
           </button>
         </div>
@@ -3188,21 +3325,29 @@ codex mcp add ${serverName} --url ${shellQuote(mcpUrl)} --bearer-token-env-var $
 function WebhookView({
   token,
   settings,
+  webhooks,
   users,
-  setSettings
+  currentUser,
+  isAdmin,
+  setSettings,
+  setWebhooks
 }: {
   token: string;
-  settings: AdminSettings;
+  settings: AdminSettings | null;
+  webhooks: WebhookConfig[];
   users: UserProfile[];
+  currentUser: string;
+  isAdmin: boolean;
   setSettings: (settings: AdminSettings | null) => void;
+  setWebhooks: (webhooks: WebhookConfig[]) => void;
 }) {
-  const [drafts, setDrafts] = useState<WebhookConfig[]>(() => settings.webhooks ?? []);
+  const [drafts, setDrafts] = useState<WebhookConfig[]>(() => webhooks);
   const [status, setStatus] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    setDrafts(settings.webhooks ?? []);
-  }, [settings.webhooks]);
+    setDrafts(webhooks);
+  }, [webhooks]);
 
   useEffect(() => {
     const waitingIds = drafts
@@ -3217,7 +3362,8 @@ function WebhookView({
     return () => window.clearInterval(handle);
   }, [drafts, token]);
 
-  function addWebhook(kind: WebhookConfig["kind"] = "generic") {
+  function addWebhook(kind: WebhookConfig["kind"] = isAdmin ? "generic" : "wechat") {
+    const normalizedKind = isAdmin ? kind : "wechat";
     setDrafts((current) => [
       ...current,
       {
@@ -3225,9 +3371,9 @@ function WebhookView({
         name: "",
         url: "",
         enabled: false,
-        assigned_to: "",
+        assigned_to: normalizedKind === "wechat" ? currentUser : "",
         secret: "",
-        kind,
+        kind: normalizedKind,
         help_prompt: defaultWebhookHelpPrompt
       }
     ]);
@@ -3237,10 +3383,25 @@ function WebhookView({
     setDrafts((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
   }
 
+  function patchWebhookKind(index: number, kind: WebhookConfig["kind"]) {
+    setDrafts((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, kind, assigned_to: kind === "wechat" ? currentUser : item.assigned_to ?? "" }
+          : item
+      )
+    );
+  }
+
+  function syncSavedWebhooks(next: WebhookConfig[]) {
+    setWebhooks(next);
+    if (settings) setSettings({ ...settings, webhooks: next });
+  }
+
   function replaceWebhook(updated: WebhookConfig) {
     setDrafts((current) => {
       const next = current.map((item) => (item.id === updated.id ? updated : item));
-      setSettings({ ...settings, webhooks: next });
+      syncSavedWebhooks(next);
       return next;
     });
   }
@@ -3258,7 +3419,7 @@ function WebhookView({
     }
     const saved = (await response.json()) as WebhookConfig[];
     setDrafts(saved);
-    setSettings({ ...settings, webhooks: saved });
+    syncSavedWebhooks(saved);
     setStatus(savedMessage);
     return saved;
   }
@@ -3328,15 +3489,17 @@ function WebhookView({
       <div className="pageTitle">
         <div>
           <h2>Webhooks</h2>
-          <p>收到 MCP 消息或微信扫码登录消息时触发；微信消息会同步进入收件箱。</p>
+          <p>微信连接固定绑定当前账号；管理员仍可维护 Generic webhook。</p>
         </div>
         <div className="rowActions">
           <button className="secondary" onClick={() => addWebhook("wechat")}>
             <Plus size={17} /> 微信扫码
           </button>
-          <button className="secondary" onClick={() => addWebhook("generic")}>
-            <Plus size={17} /> 新增 webhook
-          </button>
+          {isAdmin && (
+            <button className="secondary" onClick={() => addWebhook("generic")}>
+              <Plus size={17} /> 新增 webhook
+            </button>
+          )}
           <button className="primary" onClick={save}>
             <Check size={17} /> 保存
           </button>
@@ -3351,7 +3514,7 @@ function WebhookView({
             <Webhook size={18} />
             <div>
               <h3>触发规则</h3>
-              <p>Generic：ask_humen 创建消息时 POST 到目标 URL；微信：只同步绑定收件箱用户的请求，并把该微信收到的消息放回同一收件箱。</p>
+              <p>Generic：ask_humen 创建消息时 POST 到目标 URL；微信：只同步当前账号收件箱的请求，并把该微信收到的消息放回同一收件箱。</p>
             </div>
           </div>
         </div>
@@ -3375,10 +3538,16 @@ function WebhookView({
                 </label>
                 <label>
                   <span>类型</span>
-                  <select value={webhook.kind} onChange={(event) => patchWebhook(index, { kind: event.target.value })}>
-                    <option value="generic">Generic webhook</option>
-                    <option value="wechat">个人微信 IM（扫码登录）</option>
-                  </select>
+                  {isAdmin ? (
+                    <select value={webhook.kind} onChange={(event) => patchWebhookKind(index, event.target.value)}>
+                      <option value="generic">Generic webhook</option>
+                      <option value="wechat">个人微信 IM（扫码登录）</option>
+                    </select>
+                  ) : (
+                    <select value="wechat" disabled>
+                      <option value="wechat">个人微信 IM（扫码登录）</option>
+                    </select>
+                  )}
                 </label>
                 <label>
                   <span>目标 URL（可选）</span>
@@ -3386,14 +3555,18 @@ function WebhookView({
                 </label>
                 <label>
                   <span>绑定收件箱用户</span>
-                  <select value={webhook.assigned_to ?? ""} onChange={(event) => patchWebhook(index, { assigned_to: event.target.value })}>
-                    <option value="">未指定（Generic 全局；微信默认管理员）</option>
-                    {users.map((profile) => (
-                      <option key={profile.email} value={profile.email}>
-                        {displayIdentity(profile)} · {profile.email}
-                      </option>
-                    ))}
-                  </select>
+                  {webhook.kind === "wechat" ? (
+                    <input value={currentUser} disabled />
+                  ) : (
+                    <select value={webhook.assigned_to ?? ""} onChange={(event) => patchWebhook(index, { assigned_to: event.target.value })}>
+                      <option value="">未指定（Generic 全局）</option>
+                      {users.map((profile) => (
+                        <option key={profile.email} value={profile.email}>
+                          {displayIdentity(profile)} · {profile.email}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </label>
                 <label className={webhook.kind === "wechat" ? "webhookSecretField hidden" : "webhookSecretField"}>
                   <span>Secret</span>
@@ -3473,7 +3646,7 @@ function WebhookView({
             </article>
           );
         })}
-        {drafts.length === 0 && <Blank text="点击左上角或左下角的加号新增 webhook" />}
+        {drafts.length === 0 && <Blank text={isAdmin ? "点击上方按钮新增 webhook" : "点击“微信扫码”新增自己的微信连接"} />}
       </div>
     </section>
   );
@@ -3505,7 +3678,7 @@ function AdminView({
   reports: HumanReport[];
   settings: AdminSettings;
   setUsers: (users: UserProfile[]) => void;
-  setSettings: (settings: AdminSettings) => void;
+  setSettings: (settings: AdminSettings | null) => void;
   setReports: (reports: HumanReport[]) => void;
   onRefresh: () => void;
   refreshing: boolean;
@@ -4589,17 +4762,23 @@ function UserCard({
   profile,
   token,
   currentUser,
+  memoUnreadCount = 0,
+  memoRefreshSeq = 0,
   onAdd,
   onAccept,
   onRemove,
+  onMemoUnreadChanged,
   onChanged
 }: {
   profile: UserProfile;
   token?: string;
   currentUser?: string;
+  memoUnreadCount?: number;
+  memoRefreshSeq?: number;
   onAdd?: (email: string) => void;
   onAccept?: (email: string) => void;
   onRemove?: (email: string) => void;
+  onMemoUnreadChanged?: () => void;
   onChanged?: () => void;
 }) {
   const [mode, setMode] = useState<"idle" | "report" | "memo">("idle");
@@ -4608,24 +4787,29 @@ function UserCard({
   const [busy, setBusy] = useState(false);
   const [memos, setMemos] = useState<HumanMemo[]>([]);
   const [memoDraft, setMemoDraft] = useState("");
-  const [memosLoaded, setMemosLoaded] = useState(false);
   const banned = profile.ban_expires_at && profile.ban_expires_at > Math.floor(Date.now() / 1000);
   const isSelf = currentUser ? profile.email.toLowerCase() === currentUser.toLowerCase() : false;
   const canReview = Boolean(token) && !isSelf;
   const githubUrl = githubProfileUrl(profile);
+  const homePath = profileHomePath(profile);
 
   useEffect(() => {
     setMemos([]);
     setMemoDraft("");
-    setMemosLoaded(false);
     setMode("idle");
   }, [profile.email]);
 
   useEffect(() => {
-    if (mode === "memo" && token && !memosLoaded) {
+    if (mode === "memo" && token) {
       void loadMemos();
     }
-  }, [mode, token, memosLoaded]);
+  }, [mode, token, profile.email]);
+
+  useEffect(() => {
+    if (mode === "memo" && token && isSelf && memoRefreshSeq > 0) {
+      void loadMemos();
+    }
+  }, [mode, token, isSelf, memoRefreshSeq]);
 
   async function loadMemos() {
     if (!token) return;
@@ -4637,7 +4821,7 @@ function UserCard({
       return;
     }
     setMemos((await safeJson<HumanMemo[]>(response)) ?? []);
-    setMemosLoaded(true);
+    if (isSelf) onMemoUnreadChanged?.();
   }
 
   async function submitMemo() {
@@ -4657,7 +4841,7 @@ function UserCard({
       const memo = await safeJson<HumanMemo>(response);
       if (memo) setMemos((current) => [memo, ...current]);
       setMemoDraft("");
-      setMemosLoaded(true);
+      if (isSelf) onMemoUnreadChanged?.();
       setStatus(t("memoSaved"));
     } finally {
       setBusy(false);
@@ -4702,6 +4886,7 @@ function UserCard({
         <p>{profile.profile || t("profileMissing")}</p>
         <div className="userMetaGrid">
           <span className={profile.online ? "status onlineStatus" : "status"}>{profile.online ? t("onlineStatus") : t("offlineStatus")}</span>
+          {homePath && <a className="statusPill" href={homePath}>@{profile.platform_name}</a>}
           <span className="statusPill">{profile.provider}</span>
           <span className="statusPill">{profileVisibilityLabel(profile.visibility ?? (profile.is_public ? "public" : "private"))}</span>
           <span className="statusPill">{t("lastSeen")}: {formatProfileLastSeen(profile)}</span>
@@ -4741,6 +4926,7 @@ function UserCard({
             {token && (
               <button className="secondary small" onClick={() => setMode(mode === "memo" ? "idle" : "memo")}>
                 <MessageSquareText size={15} /> {t("memoBoard")}
+                {memoUnreadCount > 0 && <span className="unreadDot" title={`${memoUnreadCount} ${t("unread")}`} />}
               </button>
             )}
             {canReview && (
@@ -4762,7 +4948,7 @@ function UserCard({
           <div className="reviewBox memoBoard">
             <div className="memoList">
               {memos.map((memo) => (
-                <article className="memoItem" key={memo.id}>
+                <article className={`memoItem ${!memo.read_at && memo.author_email.toLowerCase() !== (currentUser ?? "").toLowerCase() ? "unread" : ""}`} key={memo.id}>
                   <p>{memo.body}</p>
                   <small>
                     {displayMemoAuthor(memo)}
@@ -5072,6 +5258,18 @@ async function refreshAgents(token: string, setAgents: (agents: ConnectedAgent[]
   setAgents(data ?? []);
 }
 
+async function refreshMemoUnread(token: string, setMemoUnread: (summary: HumanMemoUnreadSummary) => void) {
+  const response = await fetch(apiPath("/api/memos/unread"), { headers: authHeaders(token) });
+  const data = await safeJson<HumanMemoUnreadSummary>(response);
+  setMemoUnread(data ?? { total: 0, sources: [] });
+}
+
+async function refreshWebhooks(token: string, setWebhooks: (webhooks: WebhookConfig[]) => void) {
+  const response = await fetch(apiPath("/api/admin/webhooks"), { headers: authHeaders(token) });
+  const data = await safeJson<WebhookConfig[]>(response);
+  setWebhooks(data ?? []);
+}
+
 async function refreshUsers(token: string, setOnline: (users: UserProfile[]) => void, setDirectory: (users: UserProfile[]) => void, setTags: (tags: TagStat[]) => void) {
   const [online, users, tags] = await Promise.all([
     fetch(apiPath("/api/users/online"), { headers: authHeaders(token) }),
@@ -5096,7 +5294,7 @@ async function refreshAdmin(
   token: string,
   setIsAdmin: (isAdmin: boolean) => void,
   setUsers: (users: UserProfile[]) => void,
-  setSettings: (settings: AdminSettings) => void,
+  setSettings: (settings: AdminSettings | null) => void,
   setReports: (reports: HumanReport[]) => void = () => {}
 ) {
   const [users, settings, reports] = await Promise.all([
@@ -5114,6 +5312,8 @@ async function refreshAdmin(
     setReports(reportsData ?? []);
   } else {
     setIsAdmin(false);
+    setUsers([]);
+    setSettings(null);
     setReports([]);
   }
 }
@@ -5193,7 +5393,8 @@ function avatarText(user: User, preferences: Preferences) {
   return (preferences.avatarText.trim() || initials(user.email)).slice(0, 4).toUpperCase();
 }
 
-function displayIdentity(profile: Pick<UserProfile, "email" | "login"> | Pick<User, "email">) {
+function displayIdentity(profile: Pick<UserProfile, "email" | "login" | "platform_name"> | Pick<User, "email">) {
+  if ("platform_name" in profile && profile.platform_name) return profile.platform_name;
   if ("login" in profile && profile.login) return profile.login;
   if (profile.email.startsWith("github:")) return profile.email.replace(/^github:/, "GitHub ");
   return profile.email;
@@ -5204,6 +5405,22 @@ function githubProfileUrl(profile: Pick<UserProfile, "provider" | "login">) {
   const login = profile.login.trim();
   if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(login)) return null;
   return `https://github.com/${login}`;
+}
+
+function profileHomePath(profile: Pick<UserProfile, "platform_name">) {
+  const slug = profile.platform_name?.trim();
+  if (!slug) return null;
+  if (!/^[a-z0-9][a-z0-9-]{1,31}$/.test(slug)) return null;
+  return `/${encodeURIComponent(slug)}`;
+}
+
+function publicProfileSlug() {
+  const path = window.location.pathname.replace(/\/+$/, "");
+  if (!path || path === "/" || path === "/mcp") return null;
+  if (path.startsWith("/mcp/")) return null;
+  const parts = path.split("/").filter(Boolean);
+  if (parts.length !== 1) return null;
+  return decodeURIComponent(parts[0]);
 }
 
 function randomId() {
@@ -5467,7 +5684,8 @@ function logout(
   setRequests: (requests: HumanRequest[]) => void,
   setTasks: (tasks: AgentTask[]) => void,
   setSent: (sent: AnsweredRequest[]) => void,
-  setTrash: (trash: ExpiredRequest[]) => void
+  setTrash: (trash: ExpiredRequest[]) => void,
+  setWebhooks: (webhooks: WebhookConfig[]) => void
 ) {
   void fetch(apiPath("/api/auth/logout"), {
     method: "POST",
@@ -5480,6 +5698,7 @@ function logout(
   setTasks([]);
   setSent([]);
   setTrash([]);
+  setWebhooks([]);
 }
 
 function Root() {
