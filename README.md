@@ -55,7 +55,7 @@ This UI is meant to be used together with the main `humen-mcp` repository.
 
 - Backend docs: <https://github.com/LIghtJUNction/humen-mcp>
 - MCP endpoint: `/mcp`
-- Web panel route: `/mcp/`
+- Web panel route: `/`
 
 ## 中文速览
 

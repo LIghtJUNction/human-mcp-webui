@@ -4098,7 +4098,7 @@ function OAuthSetupGuide({ channels }: { channels: OAuthChannelConfig[] }) {
             <li>Client Secret 是敏感信息：不要截图外泄；生产环境建议后端加密保存，或使用服务器环境变量/密钥管理器。</li>
             <li>登录入口会跳转到 <code>/api/auth/oauth/&lt;provider&gt;/start</code>，回调为 <code>/api/auth/oauth/&lt;provider&gt;/callback</code>。</li>
             <li>新增非 GitHub 渠道前，后端也必须实现对应 provider 的 start/callback 和 token/userinfo 交换。</li>
-            <li>如果站点挂在 <code>/mcp</code> 子路径下，回调 URL 也必须包含 <code>/mcp</code>。</li>
+            <li>如果站点挂在子路径下，回调 URL 也必须包含对应子路径。</li>
             <li>生产环境必须使用 HTTPS；HTTP 回调通常只适合 localhost 开发。</li>
           </ul>
         </section>

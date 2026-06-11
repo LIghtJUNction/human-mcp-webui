@@ -11,13 +11,18 @@ function gitCommit() {
 }
 
 export default defineConfig({
-  base: "/mcp/",
+  base: "/",
   define: {
     __APP_COMMIT__: JSON.stringify(gitCommit())
   },
   plugins: [react()],
   server: {
     proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8787",
+        changeOrigin: true,
+        ws: true
+      },
       "/mcp/api": {
         target: "http://127.0.0.1:8787",
         changeOrigin: true,
