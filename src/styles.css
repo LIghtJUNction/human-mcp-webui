@@ -357,6 +357,8 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
 }
 .loginAnnouncement strong { font-family: var(--mantine-font-family-monospace); font-size: 12px; text-transform: uppercase; }
 .loginStage {
+  position: relative;
+  isolation: isolate;
   width: 100%;
   margin: 0 auto;
   overflow: visible;
@@ -366,6 +368,37 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
     repeating-radial-gradient(circle at 76% 38%, color-mix(in srgb, var(--landing-ink) 16%, transparent) 0 1px, transparent 1px 10px),
     linear-gradient(180deg, var(--landing-stage) 0%, var(--landing-stage-2) 100%);
   color: var(--landing-ink);
+}
+.loginStage::before,
+.loginStage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.loginStage::before {
+  background:
+    repeating-radial-gradient(circle at 76% 30%, transparent 0 10px, color-mix(in srgb, var(--landing-ink) 18%, transparent) 10px 11px, transparent 11px 20px),
+    radial-gradient(circle at 80% 22%, color-mix(in srgb, var(--landing-accent) 22%, transparent), transparent 34%);
+  mask-image: linear-gradient(180deg, black 0%, black 76%, transparent 100%);
+  opacity: 0.72;
+  transform-origin: 76% 30%;
+  animation: landingRingDrift 18s ease-in-out infinite alternate;
+}
+.loginStage::after {
+  background:
+    repeating-radial-gradient(circle at 76% 30%, transparent 0 17px, color-mix(in srgb, var(--landing-accent) 24%, transparent) 17px 18px, transparent 18px 34px);
+  mask-image: radial-gradient(circle at 76% 30%, black 0%, black 34%, transparent 62%);
+  opacity: 0.32;
+  transform-origin: 76% 30%;
+  animation: landingRingPulse 8s ease-in-out infinite;
+}
+.loginNav,
+.loginHeroLayout,
+.loginFlowStage {
+  position: relative;
+  z-index: 1;
 }
 .loginNav {
   display: grid;
@@ -831,13 +864,37 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
   30% { opacity: 0.75; }
   to { transform: translateX(190%); opacity: 0; }
 }
+@keyframes landingRingDrift {
+  0% {
+    transform: translate3d(-1.2%, -0.8%, 0) scale(1);
+    opacity: 0.52;
+  }
+  45% {
+    transform: translate3d(1.4%, 0.7%, 0) scale(1.018) rotate(0.35deg);
+    opacity: 0.78;
+  }
+  100% {
+    transform: translate3d(-0.4%, 1.1%, 0) scale(1.028) rotate(-0.25deg);
+    opacity: 0.62;
+  }
+}
+@keyframes landingRingPulse {
+  0%, 100% {
+    transform: scale(0.985);
+    opacity: 0.18;
+  }
+  50% {
+    transform: scale(1.035);
+    opacity: 0.42;
+  }
+}
 
 [data-compact="true"] :where(.sidebar, .topbar, .page, .task) { padding: 14px; }
 [data-compact="true"] .requestItem { min-height: 52px; }
 .spin { animation: spin 900ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .spin, .visibilityBeam.visible::after { animation: none; }
+  .spin, .visibilityBeam.visible::after, .loginStage::before, .loginStage::after { animation: none; }
   .visibilityNode, .visibilityBeam, .kineticTitle span[aria-hidden="true"] { transition: none; }
 }
 
