@@ -1566,6 +1566,7 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [authConfig, setAuthConfig] = useState<AuthConfig>({ github_enabled: false, allow_registration: true });
   const [publicLeaderboard, setPublicLeaderboard] = useState<HumanLeaderboardEntry[]>([]);
+  const [landingTone, setLandingTone] = useState<"moss" | "graphite" | "sand" | "sky">("moss");
 
   useEffect(() => {
     fetch(apiPath("/api/auth/config"))
@@ -1698,7 +1699,7 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
   );
 
   return (
-    <main className="loginShell">
+    <main className="loginShell" data-landing-tone={landingTone}>
       <a className="loginAnnouncement" href={`${sourceUrl}/releases`} target="_blank" rel="noreferrer">
         <span>{isZh ? "humen-mcp 现在支持 Passkey、信誉和 Agent 好友关系" : "humen-mcp now supports passkeys, reputation, and agent friendships"}</span>
         <strong>{isZh ? "查看更新 ->" : "Read the update ->"}</strong>
@@ -1713,6 +1714,7 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
             <a href="#public-sections">{isZh ? "信任" : "Trust"}</a>
           </nav>
           <div className="loginNavActions">
+            <LandingThemeSwitcher value={landingTone} onChange={setLandingTone} />
             <a className="loginDocsLink" href={`${sourceUrl}#readme`} target="_blank" rel="noreferrer">DOCS</a>
             <SourceLink />
           </div>
@@ -1721,7 +1723,7 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
         <section className="loginHeroLayout">
           <section className="loginHeroCopy">
             <span className="loginEyebrow">MCP / human judgment layer</span>
-            <h2>{t("loginHeroTitle")}</h2>
+            <KineticTitle text={t("loginHeroTitle")} />
             <p>{t("loginHeroSubtitle")}</p>
             <div className="loginHeroActions">
               <a className="primary" href="#login-access"><Send size={18} /> {isZh ? "接入人类协作" : "Start routing work"}</a>
@@ -1753,6 +1755,70 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
 
       <LoginPublicSections leaderboard={publicLeaderboard} />
     </main>
+  );
+}
+
+function LandingThemeSwitcher({
+  value,
+  onChange
+}: {
+  value: "moss" | "graphite" | "sand" | "sky";
+  onChange: (value: "moss" | "graphite" | "sand" | "sky") => void;
+}) {
+  const tones = [
+    { id: "moss", label: "Moss" },
+    { id: "graphite", label: "Graphite" },
+    { id: "sand", label: "Sand" },
+    { id: "sky", label: "Sky" }
+  ] as const;
+
+  return (
+    <div className="landingThemeSwitcher" aria-label="Landing theme">
+      {tones.map((tone) => (
+        <button
+          className={value === tone.id ? "active" : ""}
+          key={tone.id}
+          onClick={() => onChange(tone.id)}
+          title={tone.label}
+          type="button"
+        >
+          <span className={`themeSwatch ${tone.id}`} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function KineticTitle({ text }: { text: string }) {
+  const [active, setActive] = useState<number | null>(null);
+  const [tick, setTick] = useState(0);
+  const glyphs = ["#", "/", "{", "}", "_", "+", "=", "·", "□", "◇"];
+  const chars = Array.from(text);
+
+  useEffect(() => {
+    if (active === null) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), 70);
+    return () => window.clearInterval(timer);
+  }, [active]);
+
+  return (
+    <h2 className="kineticTitle" onPointerLeave={() => setActive(null)}>
+      {chars.map((char, index) => {
+        const distance = active === null ? 99 : Math.abs(active - index);
+        const display = active === index && char.trim() ? glyphs[(index + tick) % glyphs.length] : char;
+        return (
+          <span
+            aria-hidden="true"
+            className={distance === 0 ? "active" : distance <= 2 ? "near" : ""}
+            key={`${char}-${index}`}
+            onPointerEnter={() => setActive(index)}
+          >
+            {display === " " ? "\u00a0" : display}
+          </span>
+        );
+      })}
+      <span className="srOnly">{text}</span>
+    </h2>
   );
 }
 

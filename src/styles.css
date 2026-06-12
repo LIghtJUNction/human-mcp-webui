@@ -268,7 +268,13 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
 .weixinQr { display: grid; place-items: center; width: 160px; height: 160px; flex: 0 0 auto; border: 1px solid var(--app-border); border-radius: 6px; background: var(--app-soft); object-fit: contain; }
 
 .loginShell {
-  --app-bg: #f3f1ea;
+  --landing-bg: #f3f1ea;
+  --landing-paper: #fffdf6;
+  --landing-ink: #11110f;
+  --landing-stage: #080807;
+  --landing-stage-2: #10100f;
+  --landing-accent: #d9ff65;
+  --app-bg: var(--landing-bg);
   --app-surface: #0b0b0a;
   --app-soft: #151514;
   --app-muted: #a9a79f;
@@ -278,13 +284,34 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
   --app-primary: #fbfaf5;
   --app-primary-soft: rgba(251, 250, 245, 0.1);
   --app-info-soft: rgba(251, 250, 245, 0.07);
-  --app-accent: #d9ff65;
+  --app-accent: var(--landing-accent);
   --app-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
   position: relative;
   min-height: 100vh;
   overflow: hidden;
   background: var(--app-bg);
   color: #111;
+}
+.loginShell[data-landing-tone="graphite"] {
+  --landing-bg: #e8e8e2;
+  --landing-paper: #f8f8f0;
+  --landing-stage: #14161a;
+  --landing-stage-2: #0f1013;
+  --landing-accent: #d7d4cb;
+}
+.loginShell[data-landing-tone="sand"] {
+  --landing-bg: #eee4d1;
+  --landing-paper: #fff8e8;
+  --landing-stage: #17130f;
+  --landing-stage-2: #21190f;
+  --landing-accent: #ffd66b;
+}
+.loginShell[data-landing-tone="sky"] {
+  --landing-bg: #e7eef0;
+  --landing-paper: #f7fbfb;
+  --landing-stage: #0b1113;
+  --landing-stage-2: #10191b;
+  --landing-accent: #8ee7ff;
 }
 .loginShell::before {
   content: "";
@@ -317,10 +344,10 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
   min-height: 36px;
   margin: 18px auto 12px;
   padding: 0 16px;
-  border: 1px solid #111;
+  border: 1px solid var(--landing-ink);
   border-radius: 999px;
-  background: #fffdf6;
-  color: #111;
+  background: var(--landing-paper);
+  color: var(--landing-ink);
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
@@ -332,9 +359,9 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
   overflow: hidden;
   border: 1px solid #141412;
   background:
-    radial-gradient(circle at 83% 18%, rgba(217, 255, 101, 0.18), transparent 26%),
+    radial-gradient(circle at 83% 18%, color-mix(in srgb, var(--landing-accent) 20%, transparent), transparent 26%),
     repeating-radial-gradient(circle at 76% 38%, rgba(251, 250, 245, 0.18) 0 1px, transparent 1px 10px),
-    linear-gradient(180deg, #080807 0%, #10100f 100%);
+    linear-gradient(180deg, var(--landing-stage) 0%, var(--landing-stage-2) 100%);
   color: var(--app-text);
 }
 .loginNav { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; padding: 14px 28px; border-bottom: 1px solid #242424; }
@@ -352,11 +379,44 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
   text-decoration: none;
 }
 .loginNavActions { justify-content: flex-end; }
+.landingThemeSwitcher { display: inline-flex; align-items: center; gap: 4px; min-height: 38px; padding: 0 6px; border: 1px solid #34332f; background: rgba(10, 10, 9, 0.72); }
+.landingThemeSwitcher button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid transparent; border-radius: 0; background: transparent; }
+.landingThemeSwitcher button.active { border-color: #efede2; }
+.themeSwatch { width: 16px; height: 16px; border: 1px solid rgba(255, 255, 255, 0.36); }
+.themeSwatch.moss { background: #d9ff65; }
+.themeSwatch.graphite { background: #d7d4cb; }
+.themeSwatch.sand { background: #ffd66b; }
+.themeSwatch.sky { background: #8ee7ff; }
 .loginDocsLink { border: 1px solid #efede2; color: #efede2; font-family: var(--mantine-font-family-monospace); }
 .loginNav .sourceLink { min-height: 38px; padding: 0 16px; border-color: #efede2; background: #efede2; color: #111; text-transform: uppercase; }
 .loginHeroLayout { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(420px, 0.78fr); gap: 58px; align-items: center; min-height: 650px; padding: 68px 72px 54px; }
 .loginHeroCopy { max-width: 780px; text-align: left; }
 .loginHeroCopy h2 { max-width: 800px; color: var(--app-text); font-size: clamp(58px, 7.1vw, 104px); line-height: 0.9; letter-spacing: 0; word-break: keep-all; overflow-wrap: normal; text-wrap: balance; }
+.kineticTitle { cursor: crosshair; font-family: var(--mantine-font-family-monospace); }
+.kineticTitle span[aria-hidden="true"] {
+  display: inline-block;
+  min-width: 0.58em;
+  transition: color 120ms ease, opacity 120ms ease, transform 120ms ease, text-shadow 120ms ease;
+  will-change: transform;
+}
+.kineticTitle span.near {
+  color: color-mix(in srgb, var(--landing-accent) 46%, var(--app-text));
+  opacity: 0.86;
+  transform: translateY(-0.025em);
+}
+.kineticTitle span.active {
+  color: var(--landing-accent);
+  transform: translateY(-0.07em) scale(1.04);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--landing-accent) 58%, transparent);
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
 .loginHeroCopy p { max-width: 650px; font-size: 19px; line-height: 1.55; color: #c3c0b7; text-wrap: pretty; }
 .loginEyebrow { color: var(--app-text); font-family: var(--mantine-font-family-monospace); font-size: 12px; font-weight: 800; text-transform: uppercase; }
 .loginEyebrow::before { content: "[ "; }
@@ -402,16 +462,16 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
 .productInboxCard { width: min(370px, 88%); margin: -16px 18px 0 auto; padding: 16px; }
 .productInboxHead, .productInboxAnswer, .productInboxHead span { display: flex; align-items: center; gap: 8px; }
 .productInboxHead { justify-content: space-between; color: #efede2; font-weight: 900; }
-.productInboxHead strong { color: var(--app-accent); font-family: var(--mantine-font-family-monospace); font-size: 12px; }
+.productInboxHead strong { color: var(--landing-accent); font-family: var(--mantine-font-family-monospace); font-size: 12px; }
 .productInboxPrompt { margin: 16px 0; padding: 14px; border: 1px solid #2e2d29; background: #11110f; }
 .productInboxPrompt small { color: #a9a79f; font-family: var(--mantine-font-family-monospace); font-size: 12px; font-weight: 800; text-transform: uppercase; }
 .productInboxPrompt p { margin-top: 8px; color: #efede2; line-height: 1.45; }
-.productInboxAnswer { padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--app-accent) 55%, #2e2d29); color: #efede2; font-size: 13px; font-weight: 800; }
-.productInboxAnswer svg { color: var(--app-accent); }
-.loginAccessBand { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(360px, 0.55fr); gap: 40px; align-items: center; width: min(1160px, calc(100% - 48px)); margin: 28px auto 0; padding: 32px; border: 1px solid #111; background: #fffdf6; color: #111; }
+.productInboxAnswer { padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--landing-accent) 55%, #2e2d29); color: #efede2; font-size: 13px; font-weight: 800; }
+.productInboxAnswer svg { color: var(--landing-accent); }
+.loginAccessBand { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(360px, 0.55fr); gap: 40px; align-items: center; width: min(1160px, calc(100% - 48px)); margin: 28px auto 0; padding: 32px; border: 1px solid var(--landing-ink); background: var(--landing-paper); color: var(--landing-ink); }
 .loginAccessCopy { display: grid; gap: 12px; max-width: 660px; }
-.loginAccessCopy .loginEyebrow { color: #111; }
-.loginAccessCopy h2 { color: #111; font-size: clamp(30px, 4.5vw, 54px); line-height: 0.98; text-wrap: balance; }
+.loginAccessCopy .loginEyebrow { color: var(--landing-ink); }
+.loginAccessCopy h2 { color: var(--landing-ink); font-size: clamp(30px, 4.5vw, 54px); line-height: 0.98; text-wrap: balance; }
 .loginAccessCopy p { max-width: 560px; color: #555149; font-size: 16px; line-height: 1.65; }
 .loginPanel { align-self: center; width: 100%; padding: 18px; border: 1px solid #20201d; border-radius: 0; background: #0b0b0a; box-shadow: 10px 10px 0 rgba(17, 17, 17, 0.08); color: var(--app-text); }
 .loginPanelHead { align-items: flex-start; padding-bottom: 4px; }
@@ -441,7 +501,7 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
 .requestPreviewPanel dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; margin: 12px 0; }
 .requestPreviewPanel dt { color: var(--app-muted); }
 .requestPreviewPanel dd { margin: 0; font-weight: 700; }
-.loginPublicContent { width: min(1160px, calc(100% - 48px)); margin: 28px auto 32px; padding: 36px; border: 1px solid #111; background: #fffdf6; color: #111; }
+.loginPublicContent { width: min(1160px, calc(100% - 48px)); margin: 28px auto 32px; padding: 36px; border: 1px solid var(--landing-ink); background: var(--landing-paper); color: var(--landing-ink); }
 .introHeader { display: grid; gap: 8px; max-width: 760px; }
 .introCardTitle { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .plannedBadge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border: 1px solid var(--mantine-color-yellow-6); border-radius: 999px; background: var(--app-warning-soft); color: var(--app-text); font-size: 12px; font-weight: 800; }
@@ -451,8 +511,8 @@ pre code { padding: 0; border-radius: 0; background: transparent; color: inherit
 .loginPublicContent .introHeader h2,
 .loginPublicContent .introPanel h2,
 .loginPublicContent .introCard h3,
-.loginPublicContent .publicBoard strong { color: #111; }
-.loginPublicContent :where(.introCard, .introPanel, .publicBoard) { border-color: #111; background: #fffaf0; color: #111; box-shadow: 6px 6px 0 rgba(17, 17, 17, 0.08); }
+.loginPublicContent .publicBoard strong { color: var(--landing-ink); }
+.loginPublicContent :where(.introCard, .introPanel, .publicBoard) { border-color: var(--landing-ink); background: color-mix(in srgb, var(--landing-paper) 82%, #fff0cf); color: var(--landing-ink); box-shadow: 6px 6px 0 rgba(17, 17, 17, 0.08); }
 .loginPublicContent :where(.introHeader p, .introCard p, .introPanel p, .publicBoard em, .publicBoardEmpty) { color: #5c574f; }
 .publicBoard ol { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
 :where(.publicBoard li, .exampleList div) { justify-content: space-between; }
