@@ -365,15 +365,15 @@ type AgentAccess = {
   onboarding_completed: boolean;
 };
 
-const tokenKey = "humen-mcp-token";
-const preferencesKey = "humen-mcp-preferences";
+const tokenKey = "human-mcp-token";
+const preferencesKey = "human-mcp-preferences";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-const sourceUrl = "https://github.com/LIghtJUNction/humen-mcp";
+const sourceUrl = "https://github.com/LIghtJUNction/human-mcp";
 const reservedTags = new Set(["#admin"]);
 const memoBodyMaxChars = 1200;
 const memoBodyMaxLines = 30;
 const defaultWebhookHelpPrompt = `直接回复本消息就是回答。
-如果问题积压，请引用对应问题回复，系统会优先匹配引用中的 请求ID 或 [humen:短ID]。
+如果问题积压，请引用对应问题回复，系统会优先匹配引用中的 请求ID 或 [human:短ID]。
 网页处理地址：{url}
 请求ID：{request_id}
 短ID：{short_id}`;
@@ -563,7 +563,7 @@ const zhText: Record<string, string> = {
   loginConsoleAnswer: "回复已写入审计记录，Agent 可继续执行",
   loginFlowAgent: "Agent 请求",
   loginFlowAgentHelp: "需要判断、审批或简短文本",
-  loginFlowMcp: "ask_humen",
+  loginFlowMcp: "ask_human",
   loginFlowMcpHelp: "通过 /mcp 创建待处理请求",
   loginFlowHuman: "人类处理",
   loginFlowHumanHelp: "按标签、好友和可见范围分派",
@@ -776,7 +776,7 @@ const zhText: Record<string, string> = {
   unban: "解封",
   kick: "踢出",
   agentTitle: "接入 Agent",
-  agentSubtitle: "把 humen-mcp 添加到 Codex、Claude Code 或任何支持 MCP 的 Agent 软件。",
+  agentSubtitle: "把 human-mcp 添加到 Codex、Claude Code 或任何支持 MCP 的 Agent 软件。",
   secretMcp: "此 MCP 服务器强制要求 Agent Secret。",
   fullAgentSecret: "完整 Agent Secret",
   adminAgentSecret: "管理员：Secret 前缀",
@@ -858,7 +858,7 @@ const enText: Record<string, string> = {
   loginConsoleAnswer: "Reply recorded. Agent can continue.",
   loginFlowAgent: "Agent request",
   loginFlowAgentHelp: "Judgment, approval, or short text",
-  loginFlowMcp: "ask_humen",
+  loginFlowMcp: "ask_human",
   loginFlowMcpHelp: "Creates a pending request through /mcp",
   loginFlowHuman: "Human review",
   loginFlowHumanHelp: "Routed by tags, friends, and visibility",
@@ -1071,7 +1071,7 @@ const enText: Record<string, string> = {
   unban: "Unban",
   kick: "Kick",
   agentTitle: "Connect Agent",
-  agentSubtitle: "Add humen-mcp to Codex, Claude Code, or any MCP-capable agent.",
+  agentSubtitle: "Add human-mcp to Codex, Claude Code, or any MCP-capable agent.",
   secretMcp: "This MCP server always requires an Agent Secret.",
   fullAgentSecret: "Full Agent Secret",
   adminAgentSecret: "Admin: Secret prefix",
@@ -1196,7 +1196,7 @@ function reloadPanel() {
 
 function FrontendVersion() {
   return (
-    <span className="frontendVersion" title={`humen-mcp-webui ${__APP_COMMIT__}`}>
+    <span className="frontendVersion" title={`human-mcp-webui ${__APP_COMMIT__}`}>
       {t("frontendVersion")} {__APP_COMMIT__}
     </span>
   );
@@ -1206,7 +1206,7 @@ function BrandLockup() {
   return (
     <div className="brandLockup">
       <img className="appLogo" src={logoUrl} alt="" />
-      <h1>humen-mcp</h1>
+      <h1>human-mcp</h1>
     </div>
   );
 }
@@ -1803,7 +1803,7 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
   return (
     <main className="loginShell" data-landing-tone={landingTone}>
       <a className="loginAnnouncement" href={`${sourceUrl}/releases`} target="_blank" rel="noreferrer">
-        <span>{isZh ? "humen-mcp 现在支持 Passkey、信誉和 Agent 好友关系" : "humen-mcp now supports passkeys, reputation, and agent friendships"}</span>
+        <span>{isZh ? "human-mcp 现在支持 Passkey、信誉和 Agent 好友关系" : "human-mcp now supports passkeys, reputation, and agent friendships"}</span>
         <strong>{isZh ? "查看更新 ->" : "Read the update ->"}</strong>
       </a>
 
@@ -1831,7 +1831,7 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
               <a className="primary" href="#login-access"><Send size={18} /> {isZh ? "接入人类协作" : "Start routing work"}</a>
               <a className="secondary" href="/mcp/"><Inbox size={18} /> {t("openWorkspace")}</a>
             </div>
-            <div className="loginHeroMetrics" aria-label="humen-mcp status">
+            <div className="loginHeroMetrics" aria-label="human-mcp status">
               <span><strong>/mcp</strong> endpoint</span>
               <span><strong>passkey</strong> ready</span>
               <span><strong>audit</strong> logged</span>
@@ -1926,7 +1926,7 @@ function KineticTitle({ text }: { text: string }) {
 
 function LoginProductShowcase() {
   const isZh = currentLanguage() === "zh";
-  const code = `const answer = await ask_humen({
+  const code = `const answer = await ask_human({
   kind: "judgment",
   title: "Deploy review",
   prompt: "Can I ship this change?",
@@ -1936,7 +1936,7 @@ function LoginProductShowcase() {
 if (answer.ok) continue_agent();`;
 
   return (
-    <section className="loginProductShowcase" aria-label="humen-mcp product preview">
+    <section className="loginProductShowcase" aria-label="human-mcp product preview">
       <div className="productAscii" aria-hidden="true">
         {"{ human }\n  -> /mcp\n      -> agent"}
       </div>
@@ -2001,7 +2001,7 @@ function LoginFlowStage() {
   ];
 
   return (
-    <section className="loginFlowStage" aria-label="humen-mcp request flow">
+    <section className="loginFlowStage" aria-label="human-mcp request flow">
       <div className="handoffRail">
         {flowSteps.map((step) => (
           <article className="handoffStep" key={step.label}>
@@ -2405,7 +2405,7 @@ function loginPublicCopy() {
       security: {
         eyebrow: "security model",
         title: "Security design: separate what an agent can do, who it can reach, and who is accountable for the answer",
-        body: "humen-mcp is not a public question box. It is a human collaboration layer with identity, secrets, reputation, friend scopes, and an audit trail.",
+        body: "human-mcp is not a public question box. It is a human collaboration layer with identity, secrets, reputation, friend scopes, and an audit trail.",
         items: [
           {
             title: "Agent Secret",
@@ -2463,7 +2463,7 @@ function loginPublicCopy() {
       integrations: {
         eyebrow: "integrations",
         title: "Webhook, personal WeChat, and community plugins",
-        body: "Beyond the web inbox, humen-mcp is connecting human replies to external IM systems and community extensions.",
+        body: "Beyond the web inbox, human-mcp is connecting human replies to external IM systems and community extensions.",
         plannedLabel: "In development",
         items: [
           {
@@ -2558,7 +2558,7 @@ function loginPublicCopy() {
     security: {
       eyebrow: "安全模型",
       title: "安全设计：把 Agent 能做什么、能找谁、谁负责回答拆开控制",
-      body: "humen-mcp 的核心不是一个公开问答箱，而是带身份、secret、信誉、好友和审计记录的人类协作层。",
+      body: "human-mcp 的核心不是一个公开问答箱，而是带身份、secret、信誉、好友和审计记录的人类协作层。",
       items: [
         {
           title: "Agent Secret 机制",
@@ -2616,7 +2616,7 @@ function loginPublicCopy() {
     integrations: {
       eyebrow: "集成能力",
       title: "Webhook、个人微信和社区插件",
-      body: "除了网页收件箱，humen-mcp 也在把人类回复接到外部 IM 和社区扩展里。",
+      body: "除了网页收件箱，human-mcp 也在把人类回复接到外部 IM 和社区扩展里。",
       plannedLabel: "开发中",
       items: [
         {
@@ -3871,7 +3871,7 @@ function AgentView({
                 <span>{t("adminAgentSecret")}</span>
                 <input type="password" value={prefixDraft} onChange={(event) => setPrefixDraft(event.target.value)} placeholder={t("adminAgentSecret")} />
               </label>
-              <button className="secondary" onClick={() => setPrefixDraft(`humen-${randomSecret().slice(0, 18)}-`)}>
+              <button className="secondary" onClick={() => setPrefixDraft(`human-${randomSecret().slice(0, 18)}-`)}>
                 <RefreshCw size={17} /> {t("random")}
               </button>
               <button className="primary" onClick={saveAdminAgentSettings}>
@@ -3933,9 +3933,9 @@ codex mcp add ${serverName} --url ${shellQuote(mcpUrl)} --bearer-token-env-var $
               <li>默认使用标准 Bearer 认证；Codex CLI 请使用 <code>--bearer-token-env-var</code>。</li>
               <li>新增一个名为 <code>{serverName}</code> 的 remote/http MCP server。</li>
               <li>URL 填上面的 MCP Endpoint。</li>
-              <li>只有客户端无法配置 <code>Authorization: Bearer</code> 时，才使用兼容 header <code>x-humen-agent-secret</code>。</li>
+              <li>只有客户端无法配置 <code>Authorization: Bearer</code> 时，才使用兼容 header <code>x-human-agent-secret</code>。</li>
               <li>如果当前是 CLI 工具，请用命令行添加；不要直接编辑配置文件。</li>
-              <li>保存后重启 Agent，执行 tools/list 确认能看到 ask_humen 和 create_humen_task。</li>
+              <li>保存后重启 Agent，执行 tools/list 确认能看到 ask_human 和 create_human_task。</li>
             </ol>
           </section>
         </div>
@@ -4136,7 +4136,7 @@ function WebhookView({
             <Webhook size={18} />
             <div>
               <h3>触发规则</h3>
-              <p>Generic：ask_humen 创建消息时 POST 到目标 URL；微信：只同步当前账号收件箱的请求，并把该微信收到的消息放回同一收件箱。</p>
+              <p>Generic：ask_human 创建消息时 POST 到目标 URL；微信：只同步当前账号收件箱的请求，并把该微信收到的消息放回同一收件箱。</p>
             </div>
           </div>
         </div>
@@ -6105,23 +6105,23 @@ type AgentInstallPromptContext = {
 
 function agentOwnerName(access: AgentAccess | null, profile: UserProfile | null) {
   if (profile) return displayIdentity(profile);
-  return identityNameBase(access?.user ?? "humen");
+  return identityNameBase(access?.user ?? "human");
 }
 
 function mcpServerName(access: AgentAccess | null, profile: UserProfile | null) {
-  const baseName = profile?.login?.trim() || identityNameBase(profile?.email ?? access?.user ?? "humen");
+  const baseName = profile?.login?.trim() || identityNameBase(profile?.email ?? access?.user ?? "human");
   const slug = baseName
     .normalize("NFKD")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
-  return `${slug || "humen"}-human-mcp`;
+  return `${slug || "human"}-human-mcp`;
 }
 
 function identityNameBase(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "humen";
+  if (!trimmed) return "human";
   const withoutProvider = trimmed.replace(/^github:/i, "");
   const atIndex = withoutProvider.indexOf("@");
   return atIndex > 0 ? withoutProvider.slice(0, atIndex) : withoutProvider;
@@ -6132,7 +6132,7 @@ function mcpSecretEnvName(serverName: string) {
     .replace(/[^A-Za-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .toUpperCase();
-  return `${prefix || "HUMEN_MCP"}_SECRET`;
+  return `${prefix || "HUMAN_MCP"}_SECRET`;
 }
 
 function agentDirectoryScopeText(context: AgentInstallPromptContext) {
@@ -6192,10 +6192,10 @@ ${profile}
 
 使用边界：
 - 这是一个用户一个 secret 的 MCP 接入，不是全局匿名入口。
-- 默认的 ask_humen / approve / judge / feedback / create_humen_task 会把请求发给 secret 绑定用户：${context.ownerName}。
-- 也可以通过这个 MCP server 调用用户目录能力：list_online_humens、search_humen_profiles、list_humen_tags，用来发现和读取当前 secret 按策略可见的用户，包括绑定用户、用户朋友或公开/Agent 可见用户。
+- 默认的 ask_human / approve / judge / feedback / create_human_task 会把请求发给 secret 绑定用户：${context.ownerName}。
+- 也可以通过这个 MCP server 调用用户目录能力：list_online_humans、search_human_profiles、list_human_tags，用来发现和读取当前 secret 按策略可见的用户，包括绑定用户、用户朋友或公开/Agent 可见用户。
 - ${agentDirectoryScopeText(context)}
-- 如果要找朋友或公开用户，先用 search_humen_profiles 按姓名、简介或 #tag 搜索，再根据返回的 profile、reputation、online 状态决定是否继续。
+- 如果要找朋友或公开用户，先用 search_human_profiles 按姓名、简介或 #tag 搜索，再根据返回的 profile、reputation、online 状态决定是否继续。
 
 请优先使用标准 Bearer 认证。Codex CLI 使用 bearer token 环境变量：
 
@@ -6210,9 +6210,9 @@ codex mcp remove ${context.serverName}
 
 ${importJson}
 
-只有客户端无法配置 Authorization: Bearer 时，才使用兼容 header：x-humen-agent-secret = ${accessKey}
+只有客户端无法配置 Authorization: Bearer 时，才使用兼容 header：x-human-agent-secret = ${accessKey}
 
-配置后请重启/刷新 MCP 连接，并执行 tools/list 验证能看到 approve、judge、feedback、ask_humen、ask_humen_async、ask_humen_text_async、ask_humen_choice_async、ask_humen_judgment_async、read_humen_replies、create_humen_task、leave_humen_memo、list_humen_tasks、list_agent_inbox、request_human_friend、accept_human_friend、list_online_humens、search_humen_profiles、list_humen_tags、rate_humen、report_humen。`;
+配置后请重启/刷新 MCP 连接，并执行 tools/list 验证能看到 approve、judge、feedback、ask_human、ask_human_async、ask_human_text_async、ask_human_choice_async、ask_human_judgment_async、read_human_replies、create_human_task、leave_human_memo、list_human_tasks、list_agent_inbox、request_human_friend、accept_human_friend、list_online_humans、search_human_profiles、list_human_tags、rate_human、report_human。`;
 }
 
 async function copyToClipboard(text: string, setStatus: (status: string) => void) {

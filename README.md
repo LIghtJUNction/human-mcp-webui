@@ -1,9 +1,9 @@
 # human-mcp-webui
 
 <div align="center">
-  <img src="src/assets/logo.svg" width="96" height="96" alt="humen-mcp-webui logo" />
+  <img src="src/assets/logo.svg" width="96" height="96" alt="human-mcp-webui logo" />
 
-  <h3>Human task workbench for <code>humen-mcp</code>.</h3>
+  <h3>Human task workbench for <code>human-mcp</code>.</h3>
 
   <p>
     A compact React + Vite UI for reviewing tasks, answering requests, and handling human-in-the-loop work.
@@ -24,7 +24,7 @@
   <a href="package.json"><img alt="Bun" src="https://img.shields.io/badge/Bun-ready-000000?logo=bun&logoColor=white" /></a>
 </p>
 
-`humen-mcp-webui` is the browser-facing task panel for `humen-mcp`. It shows pending requests, lets a logged-in human respond, and keeps the flow small enough to fit the same mental model as the MCP tool call that created it.
+`human-mcp-webui` is the browser-facing task panel for `human-mcp`. It shows pending requests, lets a logged-in human respond, and keeps the flow small enough to fit the same mental model as the MCP tool call that created it.
 
 ## Quick Start
 
@@ -51,15 +51,15 @@ bun run preview
 
 ## Integration
 
-This UI is meant to be used together with the main `humen-mcp` repository.
+This UI is meant to be used together with the main `human-mcp` repository.
 
-- Backend docs: <https://github.com/LIghtJUNction/humen-mcp>
+- Backend docs: <https://github.com/LIghtJUNction/human-mcp>
 - MCP endpoint: `/mcp`
 - Web panel route: `/`
 
 ## 中文速览
 
-`humen-mcp-webui` 是 `humen-mcp` 的浏览器任务面板，用于查看待办、接收人类回复、处理需要人工判断的步骤。
+`human-mcp-webui` 是 `human-mcp` 的浏览器任务面板，用于查看待办、接收人类回复、处理需要人工判断的步骤。
 
 - 适合作为 MCP 工作流中的“人工接管界面”。
 - 技术栈为 React 19、Vite、TypeScript、Mantine。
